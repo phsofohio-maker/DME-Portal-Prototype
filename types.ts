@@ -3,6 +3,11 @@ export type UserRole = 'admin' | 'nurse' | 'homemaker' | 'office_staff';
 export type RequestType = 'dme' | 'medication' | 'clinical' | 'communication';
 export type RequestStatus = 'pending' | 'approved' | 'denied';
 
+export interface NotificationPrefs {
+  emailOnStatusChange: boolean;
+  emailOnNewMessage: boolean;
+}
+
 export interface Staff {
   uid: string;
   email: string;
@@ -11,6 +16,21 @@ export interface Staff {
   role: UserRole;
   createdAt: number;
   updatedAt: number;
+  hasCompletedOnboarding: boolean;
+  status: 'active' | 'suspended';
+  phoneNumber?: string;
+  department?: string;
+  notificationPrefs?: NotificationPrefs; // Added for email preferences
+}
+
+export interface UserInvitation {
+  id: string;
+  email: string;
+  role: UserRole;
+  invitedBy: string;
+  invitedByName: string;
+  createdAt: number;
+  status: 'pending' | 'accepted' | 'expired';
 }
 
 export interface DMEEquipment {
@@ -19,12 +39,6 @@ export interface DMEEquipment {
   sku: string;
   category: string;
   currentStock?: number;
-}
-
-export interface DMEItem {
-  itemId: string;
-  quantity: number;
-  name: string;
 }
 
 export interface Request {

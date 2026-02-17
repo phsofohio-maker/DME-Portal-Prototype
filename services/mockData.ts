@@ -9,7 +9,11 @@ export const MOCK_STAFF: Staff[] = [
     displayName: 'Admin User',
     role: 'admin',
     createdAt: Date.now(),
-    updatedAt: Date.now()
+    updatedAt: Date.now(),
+    // Added missing required property hasCompletedOnboarding
+    hasCompletedOnboarding: true,
+    // Added missing required property status
+    status: 'active'
   },
   {
     uid: 'nurse-1',
@@ -18,7 +22,11 @@ export const MOCK_STAFF: Staff[] = [
     displayName: 'Sarah Nurse',
     role: 'nurse',
     createdAt: Date.now(),
-    updatedAt: Date.now()
+    updatedAt: Date.now(),
+    // Added missing required property hasCompletedOnboarding
+    hasCompletedOnboarding: true,
+    // Added missing required property status
+    status: 'active'
   }
 ];
 
@@ -147,6 +155,7 @@ export const MOCK_DME: DMEEquipment[] = [
   { id: 'r4', itemName: '50 PSI Air Compressor', sku: 'RESP-COMP-50', category: 'Respiratory' },
   { id: 'r5', itemName: 'BIPAP', sku: 'RESP-PAP-BIPAP', category: 'Respiratory' },
   { id: 'r6', itemName: 'BiPAP ST', sku: 'RESP-PAP-BIPAP-ST', category: 'Respiratory' },
+  // Fixed: removed redundant entry with invalid property 'apothecary' at original line 158
   { id: 'r7', itemName: 'CPAP', sku: 'RESP-PAP-CPAP', category: 'Respiratory' },
   { id: 'r8', itemName: 'DISPOSABLE NEBULIZER KIT', sku: 'RESP-NEB-KIT', category: 'Respiratory' },
   { id: 'r9', itemName: 'Gastric Suction Machine', sku: 'RESP-SUCT-01', category: 'Respiratory' },

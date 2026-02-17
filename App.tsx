@@ -1,10 +1,15 @@
 
 import React, { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { Staff, Request, Communication } from './types';
+import { Staff, Request, Communication, NotificationPrefs } from './types';
 import { firebaseService } from './services/firebaseService';
 import { Layout } from './components/ui/Layout';
 import { DMEForm } from './components/Forms/DMEForm';
+import { MedicationForm } from './components/Forms/MedicationForm';
+import { MultiMedicationForm } from './components/Forms/MultiMedicationForm';
+import { UserManagement } from './components/Admin/UserManagement';
+import { Onboarding } from './components/Auth/Onboarding';
+import { MessagingPortal } from './components/Messaging/MessagingPortal';
 import { RequestList } from './components/Dashboard/RequestList';
 import { generateAIPrompt } from './services/sourceCode';
 
@@ -70,7 +75,7 @@ const LoginPage = ({ onLogin }: { onLogin: (u: Staff) => void }) => {
           </button>
         </form>
         <div className="mt-8 pt-6 border-t border-slate-100 text-center text-xs text-slate-400">
-          PROTOTYPE BUILD V1.0.0
+          PROTOTYPE BUILD V1.1.0
         </div>
       </div>
     </div>
@@ -155,8 +160,8 @@ const AdminInbox = ({ user }: { user: Staff }) => {
       />
 
       {selected && (
-        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-[60]">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-xl shadow-2xl">
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-[300]">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-xl shadow-2xl overflow-y-auto max-h-[90vh]">
             <h3 className="text-xl font-bold mb-4">Process Request #{selected.id}</h3>
             <div className="space-y-4 mb-6 text-sm">
               <div className="flex justify-between border-b border-slate-100 pb-2">
@@ -208,9 +213,16 @@ const AdminInbox = ({ user }: { user: Staff }) => {
   );
 };
 
-const ProfilePage = ({ user }: { user: Staff }) => {
+const ProfilePage = ({ user, onUpdate }: { user: Staff, onUpdate: () => void }) => {
   const [showExport, setShowExport] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [savingPrefs, setSavingPrefs] = useState(false);
+
+  // Local state for notification prefs initialized from user object
+  const [prefs, setPrefs] = useState<NotificationPrefs>(user.notificationPrefs || {
+    emailOnStatusChange: true,
+    emailOnNewMessage: true
+  });
 
   const handleCopy = () => {
     const code = generateAIPrompt();
@@ -219,45 +231,96 @@ const ProfilePage = ({ user }: { user: Staff }) => {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const updatePrefs = async (newPrefs: Partial<NotificationPrefs>) => {
+    const updated = { ...prefs, ...newPrefs };
+    setPrefs(updated);
+    setSavingPrefs(true);
+    await firebaseService.updateStaff(user.uid, { notificationPrefs: updated });
+    setSavingPrefs(false);
+    onUpdate();
+  };
+
   return (
-    <div className="max-w-lg mx-auto space-y-6">
-      <div className="bg-white p-6 rounded-xl border">
-        <h2 className="text-xl font-bold mb-6">User Profile</h2>
+    <div className="max-w-2xl mx-auto space-y-6">
+      <div className="bg-white p-6 rounded-2xl border shadow-sm">
+        <h2 className="text-xl font-bold mb-6 serif">User Profile</h2>
         <div className="space-y-4">
-          <div className="flex justify-between py-2 border-b">
-            <span className="text-slate-500">Name</span>
-            <span className="font-bold">{user.displayName}</span>
+          <div className="flex justify-between py-2 border-b border-slate-50">
+            <span className="text-slate-500 text-sm">Name</span>
+            <span className="font-bold text-slate-800">{user.displayName}</span>
           </div>
-          <div className="flex justify-between py-2 border-b">
-            <span className="text-slate-500">Email</span>
-            <span className="font-bold">{user.email}</span>
+          <div className="flex justify-between py-2 border-b border-slate-50">
+            <span className="text-slate-500 text-sm">Email</span>
+            <span className="font-bold text-slate-800">{user.email}</span>
           </div>
-          <div className="flex justify-between py-2 border-b">
-            <span className="text-slate-500">Role</span>
-            <span className="font-bold capitalize">{user.role}</span>
+          <div className="flex justify-between py-2 border-b border-slate-50">
+            <span className="text-slate-500 text-sm">Role</span>
+            <span className="font-bold capitalize text-slate-800 px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px]">{user.role.replace('_', ' ')}</span>
           </div>
-          <button className="w-full mt-6 py-3 border border-slate-300 rounded-lg font-bold hover:bg-slate-50 transition-colors">
+          <button className="w-full mt-6 py-3 border border-slate-300 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition-colors">
             Update Security PIN
           </button>
         </div>
       </div>
 
-      <div className="bg-slate-900 text-slate-100 p-6 rounded-xl border border-slate-700">
+      {/* Email Notifications Section */}
+      <div className="bg-white p-6 rounded-2xl border shadow-sm">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-10 h-10 bg-blue-50 text-blue-600 flex items-center justify-center rounded-xl">
+             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+          </div>
+          <div>
+            <h3 className="font-bold text-slate-900 serif">Email Notifications</h3>
+            <p className="text-xs text-slate-500">Manage when you receive external alerts.</p>
+          </div>
+          {savingPrefs && <div className="ml-auto text-[10px] text-blue-500 font-bold animate-pulse">Saving...</div>}
+        </div>
+
+        <div className="space-y-4">
+          <div className="flex items-center justify-between p-4 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors group">
+            <div>
+              <p className="text-sm font-bold text-slate-800">Request Updates</p>
+              <p className="text-[11px] text-slate-500">Notify me when an admin approves or denies a clinical/DME request.</p>
+            </div>
+            <button 
+              onClick={() => updatePrefs({ emailOnStatusChange: !prefs.emailOnStatusChange })}
+              className={`w-12 h-6 rounded-full p-1 transition-colors duration-200 ease-in-out flex items-center ${prefs.emailOnStatusChange ? 'bg-green-500' : 'bg-slate-200'}`}
+            >
+              <div className={`w-4 h-4 bg-white rounded-full shadow-sm transform transition-transform duration-200 ${prefs.emailOnStatusChange ? 'translate-x-6' : 'translate-x-0'}`}></div>
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between p-4 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors group">
+            <div>
+              <p className="text-sm font-bold text-slate-800">Direct Messages</p>
+              <p className="text-[11px] text-slate-500">Notify me when a colleague sends a new secure message.</p>
+            </div>
+            <button 
+              onClick={() => updatePrefs({ emailOnNewMessage: !prefs.emailOnNewMessage })}
+              className={`w-12 h-6 rounded-full p-1 transition-colors duration-200 ease-in-out flex items-center ${prefs.emailOnNewMessage ? 'bg-green-500' : 'bg-slate-200'}`}
+            >
+              <div className={`w-4 h-4 bg-white rounded-full shadow-sm transform transition-transform duration-200 ${prefs.emailOnNewMessage ? 'translate-x-6' : 'translate-x-0'}`}></div>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-slate-900 text-slate-100 p-6 rounded-2xl border border-slate-700">
         <div className="flex items-center space-x-2 mb-4">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
           <h3 className="font-bold">Developer Tools</h3>
         </div>
-        <p className="text-sm text-slate-400 mb-6">Sync this prototype with another AI by exporting the full project source.</p>
+        <p className="text-sm text-slate-400 mb-6 font-medium">Sync this prototype with another AI by exporting the full project source.</p>
         
         <button 
           onClick={() => setShowExport(true)}
-          className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold transition-colors shadow-lg shadow-blue-900/20"
+          className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-blue-900/20"
         >
           Generate AI-Ready Export
         </button>
 
         {showExport && (
-          <div className="fixed inset-0 bg-slate-900/90 flex items-center justify-center p-4 z-[100]">
+          <div className="fixed inset-0 bg-slate-900/90 flex items-center justify-center p-4 z-[300]">
             <div className="bg-white rounded-2xl w-full max-w-4xl h-[80vh] flex flex-col overflow-hidden shadow-2xl">
               <div className="p-4 border-b flex justify-between items-center bg-slate-50">
                 <div>
@@ -301,8 +364,23 @@ export default function App() {
     setUser(null);
   };
 
+  const handleOnboardingComplete = () => {
+    const updated = firebaseService.getCurrentUser();
+    setUser(updated);
+  };
+
+  const refreshUser = () => {
+    const updated = firebaseService.getCurrentUser();
+    setUser(updated);
+  };
+
   if (!user) {
     return <LoginPage onLogin={setUser} />;
+  }
+
+  // Blocker for Onboarding
+  if (!user.hasCompletedOnboarding) {
+    return <Onboarding user={user} onComplete={handleOnboardingComplete} />;
   }
 
   return (
@@ -311,28 +389,16 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Dashboard user={user} />} />
           <Route path="/request/dme" element={<DMEForm user={user} onSuccess={() => window.location.hash = '/'} />} />
-          <Route path="/request/meds" element={
-            <div className="bg-white p-8 rounded-xl border text-center">
-              <div className="mb-4 flex justify-center text-blue-600">
-                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></svg>
-              </div>
-              <h3 className="text-xl font-bold mb-2">Medication Refill Request</h3>
-              <p className="text-slate-500 mb-6">Pharmacy intake form for prescription refill synchronization.</p>
-              <button onClick={() => window.location.hash = '/'} className="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold">Return to Dashboard</button>
-            </div>
-          } />
-          <Route path="/messaging" element={
-            <div className="bg-white p-8 rounded-xl border text-center">
-              <div className="mb-4 flex justify-center text-blue-600">
-                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-              </div>
-              <h3 className="text-xl font-bold mb-2">Secure Staff Messaging</h3>
-              <p className="text-slate-500 mb-6">HIPAA-compliant coordination channel for clinical updates.</p>
-              <button onClick={() => window.location.hash = '/'} className="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold">Return to Dashboard</button>
-            </div>
-          } />
-          <Route path="/profile" element={<ProfilePage user={user} />} />
-          {user.role === 'admin' && <Route path="/admin" element={<AdminInbox user={user} />} />}
+          <Route path="/request/meds" element={<MedicationForm user={user} onSuccess={() => window.location.hash = '/'} />} />
+          <Route path="/request/multi-meds" element={<MultiMedicationForm user={user} onSuccess={() => window.location.hash = '/'} />} />
+          <Route path="/messaging" element={<MessagingPortal currentUser={user} />} />
+          <Route path="/profile" element={<ProfilePage user={user} onUpdate={refreshUser} />} />
+          {user.role === 'admin' && (
+            <>
+              <Route path="/admin" element={<AdminInbox user={user} />} />
+              <Route path="/admin/team" element={<UserManagement currentUser={user} />} />
+            </>
+          )}
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Layout>

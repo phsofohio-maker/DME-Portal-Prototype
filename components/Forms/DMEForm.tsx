@@ -414,17 +414,17 @@ export const DMEForm: React.FC<DMEFormProps> = ({ user, onSuccess }) => {
         </section>
 
         {/* --- SUBMIT FOOTER --- */}
-        <div className="bg-white rounded-2xl p-6 border border-[#e2e8f0] shadow-xl flex flex-col md:flex-row items-center justify-between gap-6 animate-[rise_0.35s_0.25s_ease_both]">
+        <div className="bg-white rounded-2xl p-6 border border-[#e2e8f0] shadow-xl flex flex-col md:flex-row items-center justify-start gap-12 animate-[rise_0.35s_0.25s_ease_both]">
           <div className="text-sm">
             <span className="font-bold text-[#0f172a]">Ready to submit?</span>
             <p className="text-slate-500">This request will route to your DME coordinator. You'll receive a confirmation email.</p>
           </div>
           <div className="flex gap-3 w-full md:w-auto">
-            <button type="button" className="flex-1 px-6 py-3 border-[1.5px] border-[#e2e8f0] rounded-xl font-bold text-slate-500 hover:bg-slate-50 transition-colors">Save Draft</button>
+            <button type="button" className="px-8 py-3 border-[1.5px] border-[#e2e8f0] rounded-xl font-bold text-slate-500 hover:bg-slate-50 transition-colors">Save Draft</button>
             <button
               disabled={loading || !selectedPatient || !signed}
               type="submit"
-              className="flex-1 md:flex-none px-10 py-3 bg-gradient-to-br from-[#2563eb] to-[#0e1f38] text-white rounded-xl font-bold shadow-lg shadow-blue-500/20 hover:-translate-y-0.5 transition-all active:scale-95 disabled:opacity-50 disabled:translate-y-0"
+              className="px-10 py-3 bg-gradient-to-br from-[#2563eb] to-[#0e1f38] text-white rounded-xl font-bold shadow-lg shadow-blue-500/20 hover:-translate-y-0.5 transition-all active:scale-95 disabled:opacity-50 disabled:translate-y-0"
             >
               {loading ? 'Submitting…' : 'Submit Request →'}
             </button>
