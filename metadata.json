@@ -1,0 +1,7 @@
+{
+  "name": "Parrish DME Portal",
+  "description": "A secure, mobile-responsive portal for Durable Medical Equipment (DME) requests, medication refills, and staff communication for Parrish Health Systems.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
