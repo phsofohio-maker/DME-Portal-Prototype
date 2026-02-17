@@ -52,6 +52,8 @@ export const MultiMedicationForm: React.FC<MultiMedicationFormProps> = ({ user, 
   const [signed, setSigned] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const searchTimers = useRef<{ [key: number]: any }>({});
+
   // --- RxNorm API Check ---
   useEffect(() => {
     const checkApi = async () => {
@@ -105,40 +107,48 @@ export const MultiMedicationForm: React.FC<MultiMedicationFormProps> = ({ user, 
 
   const removeMedRow = (id: number) => {
     setMeds(meds.filter(m => m.id !== id));
+    if (searchTimers.current[id]) clearTimeout(searchTimers.current[id]);
   };
 
   const updateMedRow = (id: number, updates: Partial<MedicationRow>) => {
-    setMeds(meds.map(m => m.id === id ? { ...m, ...updates } : m));
+    setMeds(prevMeds => prevMeds.map(m => m.id === id ? { ...m, ...updates } : m));
   };
 
   // --- Per-row Search Logic ---
-  const handleDrugSearch = async (id: number, query: string) => {
+  const handleDrugSearch = (id: number, query: string) => {
+    // Immediately update text so typing feels native
+    updateMedRow(id, { searchQuery: query });
+
+    if (searchTimers.current[id]) clearTimeout(searchTimers.current[id]);
+
     if (query.length < 2) {
-      updateMedRow(id, { searchQuery: query, results: [], isDropdownOpen: false });
+      updateMedRow(id, { results: [], isDropdownOpen: false, isLoading: false });
       return;
     }
-    updateMedRow(id, { searchQuery: query, isLoading: true });
 
-    try {
-      const url = `https://clinicaltables.nlm.nih.gov/api/rxterms/v3/search?terms=${encodeURIComponent(query)}&ef=STRENGTHS_AND_FORMS,RXCUIS&maxList=10`;
-      const res = await fetch(url);
-      const data = await res.json();
-      const names = data[1] || [];
-      const extras = data[2] || {};
-      const strengths = extras['STRENGTHS_AND_FORMS'] || [];
-      const rxcuis = extras['RXCUIS'] || [];
+    searchTimers.current[id] = setTimeout(async () => {
+      updateMedRow(id, { isLoading: true });
+      try {
+        const url = `https://clinicaltables.nlm.nih.gov/api/rxterms/v3/search?terms=${encodeURIComponent(query)}&ef=STRENGTHS_AND_FORMS,RXCUIS&maxList=10`;
+        const res = await fetch(url);
+        const data = await res.json();
+        const names = data[1] || [];
+        const extras = data[2] || {};
+        const strengths = extras['STRENGTHS_AND_FORMS'] || [];
+        const rxcuis = extras['RXCUIS'] || [];
 
-      const results = names.map((name: string, i: number) => ({
-        name,
-        strengths: strengths[i] || [],
-        rxcuis: rxcuis[i] || [],
-        type: name.split(' ')[0] === name.split(' ')[0].toLowerCase() ? 'generic' : 'brand'
-      }));
+        const results = names.map((name: string, i: number) => ({
+          name,
+          strengths: strengths[i] || [],
+          rxcuis: rxcuis[i] || [],
+          type: name.split(' ')[0] === name.split(' ')[0].toLowerCase() ? 'generic' : 'brand'
+        }));
 
-      updateMedRow(id, { results, isDropdownOpen: true, isLoading: false });
-    } catch (err) {
-      updateMedRow(id, { isLoading: false });
-    }
+        updateMedRow(id, { results, isDropdownOpen: true, isLoading: false });
+      } catch (err) {
+        updateMedRow(id, { isLoading: false });
+      }
+    }, 400);
   };
 
   const selectRowDrug = async (id: number, drug: any) => {
@@ -353,8 +363,11 @@ export const MultiMedicationForm: React.FC<MultiMedicationFormProps> = ({ user, 
             ) : (
               <div className="space-y-6">
                 {meds.map((row, index) => (
-                  <div key={row.id} className={`border-[1.5px] rounded-2xl overflow-hidden transition-all duration-300 animate-[rise_0.25s_ease_both] ${row.drug ? 'border-[#5eead4] bg-gradient-to-b from-[#f0fdfa] to-white' : 'border-[#e2e8f0] bg-white'}`}>
-                    <div className={`px-4 py-3 flex items-center gap-3 border-b border-[#e2e8f0] ${row.drug ? 'bg-[#0d9488]/5 border-[#ccfbf1]' : 'bg-slate-50'}`}>
+                  <div 
+                    key={row.id} 
+                    className={`border-[1.5px] rounded-2xl transition-all duration-300 animate-[rise_0.25s_ease_both] ${row.drug ? 'border-[#5eead4] bg-gradient-to-b from-[#f0fdfa] to-white' : 'border-[#e2e8f0] bg-white'} ${row.isDropdownOpen ? 'z-50 relative' : 'z-0 relative'}`}
+                  >
+                    <div className={`px-4 py-3 flex items-center gap-3 border-b border-[#e2e8f0] rounded-t-2xl ${row.drug ? 'bg-[#0d9488]/5 border-[#ccfbf1]' : 'bg-slate-50'}`}>
                       <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[0.72rem] font-bold text-white ${row.drug ? 'bg-[#0d9488]' : 'bg-[#0e1f38]'}`}>
                         {index + 1}
                       </div>
