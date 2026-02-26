@@ -152,9 +152,10 @@ export const MedicationForm: React.FC<MedicationFormProps> = ({ user, onSuccess 
         patientName: selectedPatient.name,
         patientId: selectedPatient.mrn,
         details: {
-          medication: { 
-            name: selectedDrug.name, 
-            strength: selectedStrength, 
+          kind: 'medication' as const,
+          medication: {
+            name: selectedDrug.name,
+            strength: selectedStrength,
             rxcui: selectedDrug.rxcuis[0],
             extra: drugExtraInfo
           },

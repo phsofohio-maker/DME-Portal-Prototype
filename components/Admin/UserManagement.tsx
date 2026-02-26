@@ -14,9 +14,13 @@ export const UserManagement: React.FC<{ currentUser: Staff }> = ({ currentUser }
     refreshData();
   }, []);
 
-  const refreshData = () => {
-    setStaff(firebaseService.getAllStaff());
-    setInvites(firebaseService.getInvites());
+  const refreshData = async () => {
+    const [staffList, inviteList] = await Promise.all([
+      firebaseService.getAllStaff(),
+      firebaseService.getInvites(),
+    ]);
+    setStaff(staffList);
+    setInvites(inviteList);
   };
 
   const handleSendInvite = async (e: React.FormEvent) => {

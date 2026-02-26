@@ -62,6 +62,7 @@ export const DMEForm: React.FC<DMEFormProps> = ({ user, onSuccess }) => {
         patientName: selectedPatient.name,
         patientId: selectedPatient.mrn,
         details: {
+          kind: 'dme' as const,
           equipment: { category, item, reqType, delivery, specialFeatures },
           clinical: { icd10, secondaryIcd10, justification, prescriptionDate, lengthOfNeed, priorAuth, urgency },
           consents

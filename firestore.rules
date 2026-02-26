@@ -1,0 +1,120 @@
+rules_version = '2';
+
+// ─── Parrish Health DME Portal — Firestore Security Rules ────────────────────
+//
+// Enforcement model (Phase 1):
+//   • All reads/writes require authentication (Firebase Auth UID present).
+//   • Role-based access is derived from the caller's own staff document.
+//   • Audit log is append-only and writable ONLY by Cloud Functions.
+//   • No hard deletes on any collection — soft-delete via status field.
+//
+// HIPAA mapping:
+//   Access Control (164.312(a)) — enforced below via role checks
+//   Audit Controls (164.312(b)) — audit_log write-only from Cloud Functions
+//   Integrity Controls (164.312(c)) — no client-side deletes; Cloud Functions
+//                                     validate data before writes in Phase 2
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helper functions ────────────────────────────────────────────────────
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function callerRole() {
+      return get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.role;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && callerRole() == 'admin';
+    }
+
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    function isActiveStaff() {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.status == 'active';
+    }
+
+    // ── Staff profiles ──────────────────────────────────────────────────────
+    // Admins see all profiles; staff see only their own.
+    // Only admins can create; owners can update their own profile.
+    // No deletion (use status: 'suspended').
+
+    match /staff/{uid} {
+      allow read:   if isAuthenticated() && (isOwner(uid) || isAdmin());
+      allow create: if isAdmin();
+      allow update: if isOwner(uid) || isAdmin();
+      allow delete: if false;
+    }
+
+    // ── Requests ────────────────────────────────────────────────────────────
+    // Staff can create and read their own requests.
+    // Only admins can update (approve/deny).
+    // No deletion.
+
+    match /requests/{requestId} {
+      allow read:   if isAuthenticated() && (
+                      resource.data.submitterId == request.auth.uid || isAdmin()
+                    );
+      allow create: if isActiveStaff();
+      allow update: if isAdmin();
+      allow delete: if false;
+    }
+
+    // ── Communications ──────────────────────────────────────────────────────
+    // Only the sender and recipient may read a message.
+    // Any active staff member may send.
+    // No updates or deletions (immutable messages).
+
+    match /communications/{msgId} {
+      allow read:   if isAuthenticated() && (
+                      resource.data.senderId   == request.auth.uid ||
+                      resource.data.recipientId == request.auth.uid
+                    );
+      allow create: if isActiveStaff();
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // ── Invitations ─────────────────────────────────────────────────────────
+    // Only admins can manage invitations.
+
+    match /invitations/{inviteId} {
+      allow read:   if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if false;
+    }
+
+    // ── Audit log ───────────────────────────────────────────────────────────
+    // Admins can read; writes come ONLY from Cloud Functions (server-side).
+    // No client-side write, update, or delete is ever permitted.
+
+    match /audit_log/{entryId} {
+      allow read:   if isAdmin();
+      allow write:  if false;
+    }
+
+    // ── DME catalog ─────────────────────────────────────────────────────────
+    // Any authenticated staff member can read; only admins can write.
+
+    match /dme_catalog/{itemId} {
+      allow read:  if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // ── Patients (interim, until Phase 3 EHR integration) ───────────────────
+    // Any active staff member can read patient records.
+    // Only admins can add/edit (PHI).
+
+    match /patients/{patientId} {
+      allow read:  if isActiveStaff();
+      allow write: if isAdmin();
+    }
+  }
+}

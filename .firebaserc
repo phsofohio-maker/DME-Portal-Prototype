@@ -1,0 +1,10 @@
+{
+  "projects": {
+    "default":    "parrish-dme-dev",
+    "development": "parrish-dme-dev",
+    "staging":    "parrish-dme-staging",
+    "production": "parrish-dme-prod"
+  },
+  "targets": {},
+  "etags": {}
+}

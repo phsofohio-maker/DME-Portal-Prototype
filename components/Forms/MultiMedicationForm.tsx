@@ -198,6 +198,7 @@ export const MultiMedicationForm: React.FC<MultiMedicationFormProps> = ({ user, 
         patientName: selectedPatient.name,
         patientId: selectedPatient.mrn,
         details: {
+          kind: 'multi_medication' as const,
           batchType: 'multi-medication',
           medications: meds.map(m => ({
             name: m.drug.name,
