@@ -3,6 +3,10 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { MOCK_PATIENTS } from '../../services/mockData';
 import { Staff } from '../../types';
 import { firebaseService } from '../../services/firebaseService';
+import { multiMedicationFormSchema } from '../../lib/schemas';
+
+const FieldError = ({ msg }: { msg?: string }) =>
+  msg ? <p role="alert" className="text-red-500 text-xs mt-1">{msg}</p> : null;
 
 interface MedicationRow {
   id: number;
@@ -51,6 +55,8 @@ export const MultiMedicationForm: React.FC<MultiMedicationFormProps> = ({ user, 
   const [consents, setConsents] = useState<boolean[]>([false, false, false]);
   const [signed, setSigned] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitError, setSubmitError] = useState('');
 
   const searchTimers = useRef<{ [key: number]: any }>({});
 
@@ -184,11 +190,43 @@ export const MultiMedicationForm: React.FC<MultiMedicationFormProps> = ({ user, 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPatient) return alert('Please select a patient');
-    if (meds.length === 0) return alert('Please add at least one medication');
-    if (meds.some(m => !m.drug)) return alert('Please select a drug for all medication rows');
-    if (!signed) return alert('Please sign the authorization');
+    setSubmitError('');
 
+    const result = multiMedicationFormSchema.safeParse({
+      patientId: selectedPatient?.mrn ?? '',
+      patientName: selectedPatient?.name ?? '',
+      medications: meds.map((m) => ({
+        drugName: m.drug?.name ?? '',
+        drugRxcui: m.drug?.rxcuis[0],
+        strength: m.strength || undefined,
+        sig: m.sig,
+        quantity: m.quantity,
+        refills: m.refills,
+        route: m.route,
+        daysSupply: m.daysSupply,
+        indication: m.indication || undefined,
+      })),
+      primaryIcd10,
+      secondaryIcd10: secondaryIcd10 || undefined,
+      rxDate,
+      startDate: startDate || undefined,
+      generalNotes: generalNotes || undefined,
+      urgency: urgency as 'Routine' | 'Urgent' | 'STAT',
+      consents,
+      signed: signed as true,
+    });
+
+    if (!result.success) {
+      const fieldErrors: Record<string, string> = {};
+      result.error.errors.forEach((err) => {
+        const field = err.path[0]?.toString() ?? 'form';
+        if (!fieldErrors[field]) fieldErrors[field] = err.message;
+      });
+      setErrors(fieldErrors);
+      return;
+    }
+
+    setErrors({});
     setIsSubmitting(true);
     try {
       await firebaseService.submitRequest({
@@ -200,7 +238,7 @@ export const MultiMedicationForm: React.FC<MultiMedicationFormProps> = ({ user, 
         details: {
           kind: 'multi_medication' as const,
           batchType: 'multi-medication',
-          medications: meds.map(m => ({
+          medications: meds.map((m) => ({
             name: m.drug.name,
             strength: m.strength,
             sig: m.sig,
@@ -210,15 +248,15 @@ export const MultiMedicationForm: React.FC<MultiMedicationFormProps> = ({ user, 
             daysSupply: m.daysSupply,
             indication: m.indication,
             notes: m.notes,
-            rxcui: m.drug.rxcuis[0]
+            rxcui: m.drug.rxcuis[0],
           })),
           sharedClinical: { primaryIcd10, secondaryIcd10, rxDate, startDate, generalNotes, urgency },
-          consents
-        }
+          consents,
+        },
       });
       onSuccess();
-    } catch (err) {
-      alert('Submission failed');
+    } catch {
+      setSubmitError('Submission failed. Please check your connection and try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -233,7 +271,13 @@ export const MultiMedicationForm: React.FC<MultiMedicationFormProps> = ({ user, 
         <p className="text-sm text-slate-500 mt-1">Select a patient and add up to 10 medications in one batch — each searched live via RxNorm.</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      {submitError && (
+        <div role="alert" className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl p-4 mb-2">
+          {submitError}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-6" noValidate>
         {/* --- CARD 1: Patient Lookup --- */}
         <section className="bg-white rounded-2xl shadow-lg border border-[#e2e8f0] animate-[rise_0.35s_ease_both] relative z-[100]">
           <div className="px-6 py-4 border-b border-[#e2e8f0] flex items-center gap-3">
@@ -245,6 +289,7 @@ export const MultiMedicationForm: React.FC<MultiMedicationFormProps> = ({ user, 
           </div>
           
           <div className="p-6">
+            <FieldError msg={errors.patientId} />
             {!selectedPatient ? (
               <div className="relative">
                 <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
@@ -356,6 +401,7 @@ export const MultiMedicationForm: React.FC<MultiMedicationFormProps> = ({ user, 
               </div>
             )}
 
+            <FieldError msg={errors.medications} />
             {meds.length === 0 ? (
               <div className="py-12 border-2 border-dashed border-[#e2e8f0] rounded-2xl text-center text-slate-400 text-sm">
                  <svg className="w-10 h-10 mx-auto mb-3 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M3 9h18m-18 0v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9m-9 3v5m-3-2.5h6"/></svg>
@@ -645,11 +691,12 @@ export const MultiMedicationForm: React.FC<MultiMedicationFormProps> = ({ user, 
 
             <button
               type="button"
-              onClick={() => setSigned(true)}
-              className={`w-full h-20 rounded-xl border-[1.5px] flex items-center justify-center transition-all ${signed ? 'bg-[#f0fdfa] border-[#0d9488] text-[#0d9488] font-bold' : 'bg-[#f0f4f8] border-dashed border-[#e2e8f0] text-slate-400 italic hover:border-[#2563eb]'}`}
+              onClick={() => { setSigned(true); setErrors(p => ({ ...p, signed: '', consents: '' })); }}
+              className={`w-full h-20 rounded-xl border-[1.5px] flex items-center justify-center transition-all ${signed ? 'bg-[#f0fdfa] border-[#0d9488] text-[#0d9488] font-bold' : errors.signed ? 'bg-red-50 border-red-400 text-red-400 italic' : 'bg-[#f0f4f8] border-dashed border-[#e2e8f0] text-slate-400 italic hover:border-[#2563eb]'}`}
             >
               {signed ? `✓ Signed electronically — ${user.displayName}` : 'Click here to sign electronically'}
             </button>
+            <FieldError msg={errors.signed ?? errors.consents} />
           </div>
         </section>
 
@@ -672,12 +719,6 @@ export const MultiMedicationForm: React.FC<MultiMedicationFormProps> = ({ user, 
         </div>
       </form>
 
-      <style dangerouslySetInnerHTML={{ __html: `
-        @keyframes rise {
-          from { opacity: 0; transform: translateY(12px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-      `}} />
     </div>
   );
 };

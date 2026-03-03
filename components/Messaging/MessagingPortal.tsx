@@ -2,28 +2,37 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Staff, Communication } from '../../types';
 import { firebaseService } from '../../services/firebaseService';
+import { ContactSkeleton } from '../ui/LoadingSkeleton';
 
 export const MessagingPortal: React.FC<{ currentUser: Staff }> = ({ currentUser }) => {
   const [contacts, setContacts] = useState<Staff[]>([]);
+  const [contactsLoading, setContactsLoading] = useState(true);
   const [selectedContact, setSelectedContact] = useState<Staff | null>(null);
   const [messages, setMessages] = useState<Communication[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Load contacts once (async — replaces the synchronous prototype call)
   useEffect(() => {
-    const allStaff = firebaseService.getAllStaff();
-    setContacts(allStaff.filter(s => s.uid !== currentUser.uid));
+    firebaseService.getAllStaff().then((allStaff) => {
+      setContacts(allStaff.filter((s) => s.uid !== currentUser.uid));
+      setContactsLoading(false);
+    });
   }, [currentUser.uid]);
 
+  // Real-time message subscription — replaces 1-second setInterval polling
   useEffect(() => {
-    if (selectedContact) {
-      const interval = setInterval(() => {
-        const chatHistory = firebaseService.getMessagesBetween(currentUser.uid, selectedContact.uid);
-        setMessages(chatHistory);
-      }, 1000);
-      return () => clearInterval(interval);
+    if (!selectedContact) {
+      setMessages([]);
+      return;
     }
+    const unsubscribe = firebaseService.subscribeToMessagesBetween(
+      currentUser.uid,
+      selectedContact.uid,
+      setMessages
+    );
+    return unsubscribe;
   }, [selectedContact, currentUser.uid]);
 
   useEffect(() => {
@@ -42,12 +51,11 @@ export const MessagingPortal: React.FC<{ currentUser: Staff }> = ({ currentUser 
       recipientId: selectedContact.uid,
       recipientName: selectedContact.displayName,
       messageType: 'clinical',
-      messageBody: newMessage.trim()
+      messageBody: newMessage.trim(),
     });
 
     setNewMessage('');
-    const updated = firebaseService.getMessagesBetween(currentUser.uid, selectedContact.uid);
-    setMessages(updated);
+    // No manual refresh needed — onSnapshot fires automatically
   };
 
   const filteredContacts = contacts.filter(c => 
@@ -73,16 +81,21 @@ export const MessagingPortal: React.FC<{ currentUser: Staff }> = ({ currentUser 
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
-          {filteredContacts.length === 0 ? (
-            <div className="p-8 text-center text-slate-400 text-sm">
+        <div className="flex-1 overflow-y-auto" role="list" aria-label="Staff directory">
+          {contactsLoading ? (
+            Array.from({ length: 4 }).map((_, i) => <ContactSkeleton key={i} />)
+          ) : filteredContacts.length === 0 ? (
+            <div className="p-8 text-center text-slate-400 text-sm" role="status">
               <p>No contacts found.</p>
             </div>
           ) : (
-            filteredContacts.map(contact => (
+            filteredContacts.map((contact) => (
               <button
                 key={contact.uid}
                 onClick={() => setSelectedContact(contact)}
+                role="listitem"
+                aria-pressed={selectedContact?.uid === contact.uid}
+                aria-label={`Message ${contact.displayName}, ${contact.role.replace('_', ' ')}`}
                 className={`w-full p-4 flex items-center gap-3 transition-all border-b border-slate-100/50 ${selectedContact?.uid === contact.uid ? 'bg-white shadow-sm z-10 scale-[1.02] border-l-4 border-l-blue-600' : 'hover:bg-white/60 opacity-80 hover:opacity-100'}`}
               >
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 shadow-sm ${selectedContact?.uid === contact.uid ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'}`}>

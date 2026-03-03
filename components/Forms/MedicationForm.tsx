@@ -3,6 +3,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { MOCK_PATIENTS } from '../../services/mockData';
 import { Staff } from '../../types';
 import { firebaseService } from '../../services/firebaseService';
+import { medicationFormSchema } from '../../lib/schemas';
+
+const FieldError = ({ msg }: { msg?: string }) =>
+  msg ? <p role="alert" className="text-red-500 text-xs mt-1">{msg}</p> : null;
 
 interface MedicationFormProps {
   user: Staff;
@@ -42,6 +46,8 @@ export const MedicationForm: React.FC<MedicationFormProps> = ({ user, onSuccess 
   const [consents, setConsents] = useState<boolean[]>([false, false, false]);
   const [signed, setSigned] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitError, setSubmitError] = useState('');
 
   // --- RxNorm API Initialization ---
   useEffect(() => {
@@ -139,10 +145,38 @@ export const MedicationForm: React.FC<MedicationFormProps> = ({ user, onSuccess 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPatient) return alert('Please select a patient');
-    if (!selectedDrug) return alert('Please select a medication');
-    if (!signed) return alert('Please sign the authorization');
+    setSubmitError('');
 
+    const result = medicationFormSchema.safeParse({
+      patientId: selectedPatient?.mrn ?? '',
+      patientName: selectedPatient?.name ?? '',
+      drugName: selectedDrug?.name ?? '',
+      drugRxcui: selectedDrug?.rxcuis[0],
+      selectedStrength,
+      icd10,
+      indication,
+      sig,
+      quantity,
+      refills,
+      startDate,
+      daysSupply,
+      route,
+      urgency: urgency as 'Routine' | 'Urgent' | 'STAT',
+      consents,
+      signed: signed as true,
+    });
+
+    if (!result.success) {
+      const fieldErrors: Record<string, string> = {};
+      result.error.errors.forEach((err) => {
+        const field = err.path[0]?.toString() ?? 'form';
+        if (!fieldErrors[field]) fieldErrors[field] = err.message;
+      });
+      setErrors(fieldErrors);
+      return;
+    }
+
+    setErrors({});
     setIsSubmitting(true);
     try {
       await firebaseService.submitRequest({
@@ -157,15 +191,15 @@ export const MedicationForm: React.FC<MedicationFormProps> = ({ user, onSuccess 
             name: selectedDrug.name,
             strength: selectedStrength,
             rxcui: selectedDrug.rxcuis[0],
-            extra: drugExtraInfo
+            extra: drugExtraInfo,
           },
           clinical: { icd10, indication, sig, quantity, refills, startDate, daysSupply, route, urgency },
-          consents
-        }
+          consents,
+        },
       });
       onSuccess();
-    } catch (err) {
-      alert('Submission failed');
+    } catch {
+      setSubmitError('Submission failed. Please check your connection and try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -178,7 +212,13 @@ export const MedicationForm: React.FC<MedicationFormProps> = ({ user, onSuccess 
         <p className="text-sm text-slate-500 mt-1">Select a patient, search for the medication via RxNorm, then provide clinical details.</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      {submitError && (
+        <div role="alert" className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl p-4 mb-2">
+          {submitError}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-6" noValidate>
         {/* --- CARD 1: Patient Lookup --- */}
         <section className="bg-white rounded-2xl shadow-lg border border-[#e2e8f0] animate-[rise_0.35s_ease_both] relative z-[40]">
           <div className="px-6 py-4 border-b border-[#e2e8f0] flex items-center gap-3">
@@ -188,8 +228,9 @@ export const MedicationForm: React.FC<MedicationFormProps> = ({ user, onSuccess 
             <h3 className="text-[0.88rem] font-bold text-[#0e1f38]">Patient</h3>
             <span className="ml-auto text-[0.68rem] font-bold tracking-wider uppercase px-2 py-1 rounded-full bg-red-100 text-red-800">Required</span>
           </div>
-          
+
           <div className="p-6">
+            <FieldError msg={errors.patientId} />
             {!selectedPatient ? (
               <div className="relative">
                 <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
@@ -282,6 +323,7 @@ export const MedicationForm: React.FC<MedicationFormProps> = ({ user, onSuccess 
               </div>
             </div>
 
+            <FieldError msg={errors.drugName} />
             <div className="relative">
               {!selectedDrug ? (
                 <div className="flex items-center border-[1.5px] border-[#e2e8f0] bg-[#f0f4f8] rounded-xl overflow-hidden focus-within:border-[#0d9488] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#0d9488]/5 transition-all">
@@ -527,11 +569,12 @@ export const MedicationForm: React.FC<MedicationFormProps> = ({ user, onSuccess 
 
             <button
               type="button"
-              onClick={() => setSigned(true)}
-              className={`w-full h-20 rounded-xl border-[1.5px] flex items-center justify-center transition-all ${signed ? 'bg-[#f0fdfa] border-[#0d9488] text-[#0d9488] font-bold' : 'bg-[#f0f4f8] border-dashed border-[#e2e8f0] text-slate-400 italic hover:border-[#2563eb]'}`}
+              onClick={() => { setSigned(true); setErrors(p => ({ ...p, signed: '', consents: '' })); }}
+              className={`w-full h-20 rounded-xl border-[1.5px] flex items-center justify-center transition-all ${signed ? 'bg-[#f0fdfa] border-[#0d9488] text-[#0d9488] font-bold' : errors.signed ? 'bg-red-50 border-red-400 text-red-400 italic' : 'bg-[#f0f4f8] border-dashed border-[#e2e8f0] text-slate-400 italic hover:border-[#2563eb]'}`}
             >
               {signed ? `✓ Signed electronically — ${user.displayName}` : 'Click here to sign electronically'}
             </button>
+            <FieldError msg={errors.signed ?? errors.consents} />
           </div>
         </section>
 
@@ -554,12 +597,6 @@ export const MedicationForm: React.FC<MedicationFormProps> = ({ user, onSuccess 
         </div>
       </form>
 
-      <style dangerouslySetInnerHTML={{ __html: `
-        @keyframes rise {
-          from { opacity: 0; transform: translateY(12px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-      `}} />
     </div>
   );
 };

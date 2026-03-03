@@ -199,15 +199,18 @@ export const firebaseService = {
     requestId: string,
     status: RequestStatus,
     adminNotes: string,
-    adminId: string
+    adminId: string,
+    rmiNotes?: string
   ): Promise<void> => {
-    await updateDoc(doc(db, 'requests', requestId), {
+    const update: Record<string, unknown> = {
       status,
       adminNotes,
       processedBy: adminId,
       processedAt: Date.now(),
       updatedAt: Date.now(),
-    });
+    };
+    if (rmiNotes !== undefined) update['rmiNotes'] = rmiNotes;
+    await updateDoc(doc(db, 'requests', requestId), update);
   },
 
   /**
@@ -268,6 +271,57 @@ export const firebaseService = {
       ...received.docs.map((d) => toComm(d.id, d.data())),
     ];
     return all.sort((a, b) => a.createdAt - b.createdAt);
+  },
+
+  /**
+   * Real-time listener for messages between two users (MessagingPortal).
+   * Replaces the 1-second setInterval polling from Phase 0.
+   * Returns unsubscribe function for useEffect cleanup.
+   */
+  subscribeToMessagesBetween: (
+    uid1: string,
+    uid2: string,
+    callback: (messages: Communication[]) => void
+  ): Unsubscribe => {
+    // Track latest snapshot from each direction, merge and re-emit on any change.
+    let sentDocs: Communication[] = [];
+    let receivedDocs: Communication[] = [];
+
+    const emit = () => {
+      const merged = [...sentDocs, ...receivedDocs].sort((a, b) => a.createdAt - b.createdAt);
+      callback(merged);
+    };
+
+    const unsubSent = onSnapshot(
+      query(
+        collection(db, 'communications'),
+        where('senderId', '==', uid1),
+        where('recipientId', '==', uid2),
+        orderBy('createdAt', 'asc')
+      ),
+      (snap) => {
+        sentDocs = snap.docs.map((d) => toComm(d.id, d.data()));
+        emit();
+      }
+    );
+
+    const unsubReceived = onSnapshot(
+      query(
+        collection(db, 'communications'),
+        where('senderId', '==', uid2),
+        where('recipientId', '==', uid1),
+        orderBy('createdAt', 'asc')
+      ),
+      (snap) => {
+        receivedDocs = snap.docs.map((d) => toComm(d.id, d.data()));
+        emit();
+      }
+    );
+
+    return () => {
+      unsubSent();
+      unsubReceived();
+    };
   },
 
   sendMessage: async (

@@ -1,7 +1,7 @@
 
 export type UserRole = 'admin' | 'nurse' | 'homemaker' | 'office_staff';
 export type RequestType = 'dme' | 'medication' | 'clinical' | 'communication';
-export type RequestStatus = 'pending' | 'approved' | 'denied';
+export type RequestStatus = 'pending' | 'approved' | 'denied' | 'rmi';
 
 export interface NotificationPrefs {
   emailOnStatusChange: boolean;
@@ -141,6 +141,7 @@ export interface Request {
   details: RequestDetails;
   status: RequestStatus;
   adminNotes?: string;
+  rmiNotes?: string;
   createdAt: number;
   updatedAt: number;
   processedBy?: string;
@@ -165,6 +166,7 @@ export type AuditAction =
   | 'request.create'
   | 'request.approve'
   | 'request.deny'
+  | 'request.rmi'
   | 'request.update'
   | 'staff.create'
   | 'staff.update'
