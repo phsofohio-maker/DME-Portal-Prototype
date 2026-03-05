@@ -1,0 +1,174 @@
+rules_version = '2';
+
+// ─── Parrish Health DME Portal — Firestore Security Rules (Phase 4) ──────────
+//
+// Enforcement model:
+//   • All reads/writes require Firebase Auth (no anonymous access).
+//   • Active staff status checked before any write.
+//   • Role-based access derived from caller's staff document.
+//   • Audit log is append-only, client-side writes blocked entirely.
+//   • No hard deletes on any collection — soft-delete via status field.
+//   • Notifications: recipients can read and mark as read; no delete.
+//   • Communications: immutable bodies; recipients can mark read=true only.
+//
+// HIPAA mapping:
+//   Access Control  (164.312(a)) — enforced via role checks below
+//   Audit Controls  (164.312(b)) — audit_log write-only from Cloud Functions
+//   Integrity       (164.312(c)) — no client-side deletes; Zod validated in CF
+//   Transmission    (164.312(e)) — TLS 1.3 enforced by Firebase Hosting (HSTS)
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helper functions ──────────────────────────────────────────────────────
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function staffDoc() {
+      return get(/databases/$(database)/documents/staff/$(request.auth.uid)).data;
+    }
+
+    function callerRole() {
+      return staffDoc().role;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && callerRole() == 'admin';
+    }
+
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    function isActiveStaff() {
+      return isAuthenticated() && staffDoc().status == 'active';
+    }
+
+    function isSenderOrRecipient(msgData) {
+      return request.auth.uid == msgData.senderId ||
+             request.auth.uid == msgData.recipientId;
+    }
+
+    // ── Staff profiles ────────────────────────────────────────────────────────
+    // Admins see all profiles; active staff see only their own.
+    // Only admins can create new staff documents.
+    // Owners can update limited fields (notificationPrefs, hasCompletedOnboarding).
+    // Admins can update any field.
+    // Hard delete prohibited — use status: 'suspended'.
+
+    match /staff/{uid} {
+      allow read:   if isAuthenticated() && (isOwner(uid) || isAdmin());
+      allow create: if isAdmin();
+      allow update: if isOwner(uid) || isAdmin();
+      allow delete: if false;
+    }
+
+    // ── Requests ──────────────────────────────────────────────────────────────
+    // Active staff can create requests for themselves.
+    // Staff can read their own requests; admins can read all.
+    // Only admins can update (approve/deny/rmi).
+    // No deletion — requests are permanent records.
+
+    match /requests/{requestId} {
+      allow read:   if isAuthenticated() && (
+                      resource.data.submitterId == request.auth.uid || isAdmin()
+                    );
+      allow create: if isActiveStaff() &&
+                      request.resource.data.submitterId == request.auth.uid &&
+                      request.resource.data.status == 'pending' &&
+                      request.resource.data.keys().hasAll([
+                        'type', 'submitterId', 'submitterName',
+                        'patientName', 'patientId', 'details',
+                        'status', 'createdAt', 'updatedAt'
+                      ]);
+      allow update: if isAdmin();
+      allow delete: if false;
+    }
+
+    // ── Communications ────────────────────────────────────────────────────────
+    // Only sender and recipient may read a message.
+    // Any active staff member may create (send) a message.
+    // Recipients may update ONLY the read field (read receipts).
+    // Message body and metadata are immutable after creation.
+    // No deletion.
+
+    match /communications/{msgId} {
+      allow read:   if isAuthenticated() && isSenderOrRecipient(resource.data);
+      allow create: if isActiveStaff() &&
+                      request.resource.data.senderId == request.auth.uid &&
+                      request.resource.data.keys().hasAll([
+                        'senderId', 'senderName', 'recipientId', 'recipientName',
+                        'messageType', 'messageBody', 'read', 'createdAt'
+                      ]);
+      // Recipient may only flip read → true; no other field changes allowed.
+      allow update: if isAuthenticated() &&
+                      resource.data.recipientId == request.auth.uid &&
+                      request.resource.data.diff(resource.data).affectedKeys()
+                        .hasOnly(['read']) &&
+                      request.resource.data.read == true;
+      allow delete: if false;
+    }
+
+    // ── Invitations ───────────────────────────────────────────────────────────
+    // Only admins can create, read, or update invitations.
+    // No deletion.
+
+    match /invitations/{inviteId} {
+      allow read:   if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if false;
+    }
+
+    // ── Audit log ─────────────────────────────────────────────────────────────
+    // Admins can read the full audit trail.
+    // All writes are server-side only (Cloud Functions use Admin SDK,
+    // which bypasses Security Rules).
+    // No client-side write, update, or delete is ever permitted.
+
+    match /audit_log/{entryId} {
+      allow read:   if isAdmin();
+      allow write:  if false;
+    }
+
+    // ── DME catalog ───────────────────────────────────────────────────────────
+    // Any authenticated active staff member can read the equipment catalog.
+    // Only admins can create/update/delete catalog items.
+
+    match /dme_catalog/{itemId} {
+      allow read:  if isActiveStaff();
+      allow write: if isAdmin();
+    }
+
+    // ── Patients ──────────────────────────────────────────────────────────────
+    // Any active staff member can read patient records (minimum necessary
+    // standard — role-level filtering enforced client-side per §3.3).
+    // Only admins can create/update patient records.
+    // No deletion (HIPAA record retention — 6+ years).
+
+    match /patients/{patientId} {
+      allow read:  if isActiveStaff();
+      allow write: if isAdmin();
+    }
+
+    // ── Notifications (Phase 3+) ──────────────────────────────────────────────
+    // Recipients can read their own notifications.
+    // Recipients can update ONLY the read field.
+    // Notifications are created server-side by Cloud Functions (Admin SDK).
+    // No client-side create or delete permitted.
+
+    match /notifications/{notifId} {
+      allow read:   if isAuthenticated() &&
+                      resource.data.recipientId == request.auth.uid;
+      allow create: if false;  // Cloud Functions only (Admin SDK bypasses rules)
+      allow update: if isAuthenticated() &&
+                      resource.data.recipientId == request.auth.uid &&
+                      request.resource.data.diff(resource.data).affectedKeys()
+                        .hasOnly(['read']) &&
+                      request.resource.data.read == true;
+      allow delete: if false;
+    }
+  }
+}

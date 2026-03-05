@@ -1,7 +1,7 @@
 
 export type UserRole = 'admin' | 'nurse' | 'homemaker' | 'office_staff';
 export type RequestType = 'dme' | 'medication' | 'clinical' | 'communication';
-export type RequestStatus = 'pending' | 'approved' | 'denied';
+export type RequestStatus = 'pending' | 'approved' | 'denied' | 'rmi';
 
 export interface NotificationPrefs {
   emailOnStatusChange: boolean;
@@ -11,7 +11,7 @@ export interface NotificationPrefs {
 export interface Staff {
   uid: string;
   email: string;
-  pin: string;
+  pin?: string; // Legacy field — superseded by Firebase Auth in Phase 1
   displayName: string;
   role: UserRole;
   createdAt: number;
@@ -20,7 +20,25 @@ export interface Staff {
   status: 'active' | 'suspended';
   phoneNumber?: string;
   department?: string;
-  notificationPrefs?: NotificationPrefs; // Added for email preferences
+  notificationPrefs?: NotificationPrefs;
+}
+
+export interface Patient {
+  id: string;
+  mrn: string;
+  name: string;
+  initials: string;
+  color: string;
+  dob: string;
+  age: number;
+  sex: string;
+  phone: string;
+  insurance: string;
+  insId: string;
+  physician: string;
+  address: string;
+  allergies: string;
+  conditions: string[];
 }
 
 export interface UserInvitation {
@@ -41,6 +59,78 @@ export interface DMEEquipment {
   currentStock?: number;
 }
 
+// ─── Request Details — Discriminated Union ────────────────────────────────────
+
+export interface DMERequestDetails {
+  kind: 'dme';
+  equipment: {
+    category: string;
+    item: string;
+    reqType: string;
+    delivery: string;
+    specialFeatures: string;
+  };
+  clinical: {
+    icd10: string;
+    secondaryIcd10: string;
+    justification: string;
+    prescriptionDate: string;
+    lengthOfNeed: string;
+    priorAuth: string;
+    urgency: string;
+  };
+  consents: unknown;
+}
+
+export interface MedicationRequestDetails {
+  kind: 'medication';
+  medication: {
+    name: string;
+    strength: string;
+    form?: string;
+    rxcui?: string;
+    quantity?: number;
+    refills?: number;
+    sig?: string;
+    [key: string]: unknown;
+  };
+  clinical: {
+    icd10?: string;
+    diagnosis?: string;
+    allergies?: string;
+    pharmacyNotes?: string;
+    [key: string]: unknown;
+  };
+}
+
+export interface MultiMedicationRequestDetails {
+  kind: 'multi_medication';
+  batchType: 'multi-medication';
+  medications: Array<{
+    name: string;
+    strength?: string;
+    form?: string;
+    rxcui?: string;
+    quantity?: number;
+    refills?: number;
+    sig?: string;
+    [key: string]: unknown;
+  }>;
+  clinical?: {
+    icd10?: string;
+    notes?: string;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
+
+export type RequestDetails =
+  | DMERequestDetails
+  | MedicationRequestDetails
+  | MultiMedicationRequestDetails;
+
+// ─── Request ──────────────────────────────────────────────────────────────────
+
 export interface Request {
   id: string;
   type: RequestType;
@@ -48,9 +138,10 @@ export interface Request {
   submitterName: string;
   patientName: string;
   patientId: string;
-  details: any;
+  details: RequestDetails;
   status: RequestStatus;
   adminNotes?: string;
+  rmiNotes?: string;
   createdAt: number;
   updatedAt: number;
   processedBy?: string;
@@ -65,6 +156,56 @@ export interface Communication {
   recipientName: string;
   messageType: 'clinical' | 'general';
   messageBody: string;
+  read: boolean;
+  createdAt: number;
+}
+
+// ─── Audit Log ────────────────────────────────────────────────────────────────
+
+export type AuditAction =
+  | 'request.create'
+  | 'request.approve'
+  | 'request.deny'
+  | 'request.rmi'
+  | 'request.update'
+  | 'staff.create'
+  | 'staff.update'
+  | 'staff.suspend'
+  | 'communication.create'
+  | 'invitation.create'
+  | 'invitation.revoke'
+  | 'auth.login'
+  | 'auth.logout';
+
+export interface AuditLogEntry {
+  id: string;
+  timestamp: number;
+  actorId: string;
+  actorRole: UserRole;
+  action: AuditAction;
+  resourceType: 'request' | 'staff' | 'communication' | 'invitation' | 'dme_catalog' | 'auth';
+  resourceId: string;
+  before?: unknown;
+  after?: unknown;
+  ipAddress?: string;
+  userAgent?: string;
+}
+
+// ─── In-App Notifications ─────────────────────────────────────────────────────
+
+export type NotificationType =
+  | 'request.status_change'
+  | 'message.received'
+  | 'invitation.accepted'
+  | 'admin.action_required';
+
+export interface AppNotification {
+  id: string;
+  recipientId: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  resourceId?: string;
   read: boolean;
   createdAt: number;
 }

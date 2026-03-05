@@ -1,0 +1,200 @@
+name: Build & Deploy — Parrish DME Portal
+
+# ─── Triggers ──────────────────────────────────────────────────────────────────
+on:
+  push:
+    branches:
+      - staging     # → deploys to staging Firebase project
+      - main        # → deploys to production Firebase project
+  pull_request:
+    branches:
+      - main        # → build + lint check only (no deploy)
+
+# ─── Environment defaults ──────────────────────────────────────────────────────
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # ── 1. Build & Lint (all branches / PRs) ─────────────────────────────────────
+  build:
+    name: Build & Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build (staging config for PRs and staging branch)
+        if: github.ref != 'refs/heads/main'
+        run: npm run build
+        env:
+          VITE_FIREBASE_API_KEY:              ${{ secrets.STAGING_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN:          ${{ secrets.STAGING_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID:           ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET:       ${{ secrets.STAGING_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID:  ${{ secrets.STAGING_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID:               ${{ secrets.STAGING_FIREBASE_APP_ID }}
+
+      - name: Build (production config for main branch)
+        if: github.ref == 'refs/heads/main'
+        run: npm run build
+        env:
+          VITE_FIREBASE_API_KEY:              ${{ secrets.PROD_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN:          ${{ secrets.PROD_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID:           ${{ secrets.PROD_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET:       ${{ secrets.PROD_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID:  ${{ secrets.PROD_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID:               ${{ secrets.PROD_FIREBASE_APP_ID }}
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 1
+
+  # ── 2. Build Cloud Functions (all branches) ───────────────────────────────────
+  build-functions:
+    name: Build Cloud Functions
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: functions/package-lock.json
+
+      - name: Install Cloud Functions dependencies
+        run: npm ci
+        working-directory: functions
+
+      - name: Compile Cloud Functions
+        run: npm run build
+        working-directory: functions
+
+  # ── 3. Deploy to Staging ──────────────────────────────────────────────────────
+  deploy-staging:
+    name: Deploy → Staging
+    needs: [build, build-functions]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/staging'
+    environment: staging
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Install Cloud Functions dependencies
+        run: npm ci
+        working-directory: functions
+
+      - name: Build frontend (staging)
+        run: npm run build
+        env:
+          VITE_FIREBASE_API_KEY:              ${{ secrets.STAGING_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN:          ${{ secrets.STAGING_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID:           ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET:       ${{ secrets.STAGING_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID:  ${{ secrets.STAGING_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID:               ${{ secrets.STAGING_FIREBASE_APP_ID }}
+
+      - name: Compile Cloud Functions
+        run: npm run build
+        working-directory: functions
+
+      - name: Deploy to Firebase (staging)
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken:              ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_STAGING }}
+          projectId:              ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
+          target:                 staging
+          channelId:              live
+
+      - name: Deploy Firestore rules & Cloud Functions (staging)
+        run: |
+          npm install -g firebase-tools
+          firebase deploy --only firestore:rules,functions --project ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_STAGING }}
+
+  # ── 4. Deploy to Production (main only, manual approval required) ─────────────
+  deploy-production:
+    name: Deploy → Production
+    needs: [build, build-functions]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: production          # Requires manual approval in GitHub Environments
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Install Cloud Functions dependencies
+        run: npm ci
+        working-directory: functions
+
+      - name: Build frontend (production)
+        run: npm run build
+        env:
+          VITE_FIREBASE_API_KEY:              ${{ secrets.PROD_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN:          ${{ secrets.PROD_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID:           ${{ secrets.PROD_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET:       ${{ secrets.PROD_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID:  ${{ secrets.PROD_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID:               ${{ secrets.PROD_FIREBASE_APP_ID }}
+
+      - name: Compile Cloud Functions
+        run: npm run build
+        working-directory: functions
+
+      - name: Deploy to Firebase (production)
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken:              ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PROD }}
+          projectId:              ${{ secrets.PROD_FIREBASE_PROJECT_ID }}
+          channelId:              live
+
+      - name: Deploy Firestore rules, indexes & Cloud Functions (production)
+        run: |
+          npm install -g firebase-tools
+          firebase deploy --only firestore --project ${{ secrets.PROD_FIREBASE_PROJECT_ID }}
+          firebase deploy --only functions --project ${{ secrets.PROD_FIREBASE_PROJECT_ID }}
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PROD }}

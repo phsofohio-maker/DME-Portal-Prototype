@@ -2,29 +2,45 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Staff, Communication } from '../../types';
 import { firebaseService } from '../../services/firebaseService';
+import { ContactSkeleton } from '../ui/LoadingSkeleton';
 
 export const MessagingPortal: React.FC<{ currentUser: Staff }> = ({ currentUser }) => {
   const [contacts, setContacts] = useState<Staff[]>([]);
+  const [contactsLoading, setContactsLoading] = useState(true);
   const [selectedContact, setSelectedContact] = useState<Staff | null>(null);
   const [messages, setMessages] = useState<Communication[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Load contacts once (async — replaces the synchronous prototype call)
   useEffect(() => {
-    const allStaff = firebaseService.getAllStaff();
-    setContacts(allStaff.filter(s => s.uid !== currentUser.uid));
+    firebaseService.getAllStaff().then((allStaff) => {
+      setContacts(allStaff.filter((s) => s.uid !== currentUser.uid));
+      setContactsLoading(false);
+    });
   }, [currentUser.uid]);
 
+  // Real-time message subscription — replaces 1-second setInterval polling
   useEffect(() => {
-    if (selectedContact) {
-      const interval = setInterval(() => {
-        const chatHistory = firebaseService.getMessagesBetween(currentUser.uid, selectedContact.uid);
-        setMessages(chatHistory);
-      }, 1000);
-      return () => clearInterval(interval);
+    if (!selectedContact) {
+      setMessages([]);
+      return;
     }
+    const unsubscribe = firebaseService.subscribeToMessagesBetween(
+      currentUser.uid,
+      selectedContact.uid,
+      setMessages
+    );
+    return unsubscribe;
   }, [selectedContact, currentUser.uid]);
+
+  // Mark incoming unread messages as read whenever new messages arrive
+  useEffect(() => {
+    messages
+      .filter((m) => m.senderId !== currentUser.uid && !m.read)
+      .forEach((m) => firebaseService.markMessageRead(m.id));
+  }, [messages, currentUser.uid]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -42,12 +58,11 @@ export const MessagingPortal: React.FC<{ currentUser: Staff }> = ({ currentUser 
       recipientId: selectedContact.uid,
       recipientName: selectedContact.displayName,
       messageType: 'clinical',
-      messageBody: newMessage.trim()
+      messageBody: newMessage.trim(),
     });
 
     setNewMessage('');
-    const updated = firebaseService.getMessagesBetween(currentUser.uid, selectedContact.uid);
-    setMessages(updated);
+    // No manual refresh needed — onSnapshot fires automatically
   };
 
   const filteredContacts = contacts.filter(c => 
@@ -73,16 +88,21 @@ export const MessagingPortal: React.FC<{ currentUser: Staff }> = ({ currentUser 
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
-          {filteredContacts.length === 0 ? (
-            <div className="p-8 text-center text-slate-400 text-sm">
+        <div className="flex-1 overflow-y-auto" role="list" aria-label="Staff directory">
+          {contactsLoading ? (
+            Array.from({ length: 4 }).map((_, i) => <ContactSkeleton key={i} />)
+          ) : filteredContacts.length === 0 ? (
+            <div className="p-8 text-center text-slate-400 text-sm" role="status">
               <p>No contacts found.</p>
             </div>
           ) : (
-            filteredContacts.map(contact => (
+            filteredContacts.map((contact) => (
               <button
                 key={contact.uid}
                 onClick={() => setSelectedContact(contact)}
+                role="listitem"
+                aria-pressed={selectedContact?.uid === contact.uid}
+                aria-label={`Message ${contact.displayName}, ${contact.role.replace('_', ' ')}`}
                 className={`w-full p-4 flex items-center gap-3 transition-all border-b border-slate-100/50 ${selectedContact?.uid === contact.uid ? 'bg-white shadow-sm z-10 scale-[1.02] border-l-4 border-l-blue-600' : 'hover:bg-white/60 opacity-80 hover:opacity-100'}`}
               >
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 shadow-sm ${selectedContact?.uid === contact.uid ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
@@ -123,9 +143,9 @@ export const MessagingPortal: React.FC<{ currentUser: Staff }> = ({ currentUser 
                   </p>
                 </div>
               </div>
-              <div className="bg-amber-50 text-amber-700 px-3 py-1.5 rounded-lg border border-amber-100 text-[10px] font-bold flex items-center gap-2">
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-                HIPAA COMPLIANT CHANNEL
+              <div className="bg-slate-50 text-slate-500 px-3 py-1.5 rounded-lg border border-slate-200 text-[10px] font-bold flex items-center gap-2">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                SECURE INTERNAL CHANNEL
               </div>
             </div>
 
@@ -155,8 +175,23 @@ export const MessagingPortal: React.FC<{ currentUser: Staff }> = ({ currentUser 
                       <div className={`p-4 rounded-2xl text-sm shadow-sm transition-all ${msg.senderId === currentUser.uid ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white border border-slate-100 text-slate-700 rounded-tl-none'}`}>
                         {msg.messageBody}
                       </div>
-                      <p className={`text-[9px] mt-1 font-bold text-slate-400 px-1 ${msg.senderId === currentUser.uid ? 'text-right' : 'text-left'}`}>
-                        {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      <p className={`text-[9px] mt-1 font-bold text-slate-400 px-1 flex items-center gap-1 ${msg.senderId === currentUser.uid ? 'justify-end' : 'justify-start'}`}>
+                        <time dateTime={new Date(msg.createdAt).toISOString()}>
+                          {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </time>
+                        {msg.senderId === currentUser.uid && (
+                          <span aria-label={msg.read ? 'Read' : 'Delivered'} title={msg.read ? 'Read' : 'Delivered'}>
+                            {msg.read ? (
+                              <svg className="w-3 h-3 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                              </svg>
+                            ) : (
+                              <svg className="w-3 h-3 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                              </svg>
+                            )}
+                          </span>
+                        )}
                       </p>
                     </div>
                   </div>

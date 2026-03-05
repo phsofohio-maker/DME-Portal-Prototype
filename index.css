@@ -28,3 +28,11 @@ body {
 .serif {
   font-family: 'Source Serif 4', serif;
 }
+
+/* ─── Animations ─────────────────────────────────────────────── */
+
+/* Used by all form cards and portal sections for entrance animation */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

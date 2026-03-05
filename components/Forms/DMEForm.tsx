@@ -1,8 +1,14 @@
 
-import React, { useState, useMemo } from 'react';
-import { MOCK_DME, MOCK_PATIENTS } from '../../services/mockData';
-import { Staff } from '../../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { MOCK_DME } from '../../services/mockData';
+import { patientService } from '../../services/patientService';
+import { Staff, Patient } from '../../types';
 import { firebaseService } from '../../services/firebaseService';
+import { dmeFormSchema } from '../../lib/schemas';
+
+// ─── Inline field error helper ────────────────────────────────────────────────
+const FieldError = ({ msg }: { msg?: string }) =>
+  msg ? <p role="alert" className="text-red-500 text-xs mt-1">{msg}</p> : null;
 
 interface DMEFormProps {
   user: Staff;
@@ -11,9 +17,11 @@ interface DMEFormProps {
 
 export const DMEForm: React.FC<DMEFormProps> = ({ user, onSuccess }) => {
   // --- Form State ---
-  const [selectedPatient, setSelectedPatient] = useState<any>(null);
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [filteredPatients, setFilteredPatients] = useState<Patient[]>([]);
+  const [patientSearching, setPatientSearching] = useState(false);
   
   const [category, setCategory] = useState('');
   const [item, setItem] = useState('');
@@ -32,16 +40,20 @@ export const DMEForm: React.FC<DMEFormProps> = ({ user, onSuccess }) => {
   const [consents, setConsents] = useState<boolean[]>([false, false, false]);
   const [signed, setSigned] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitError, setSubmitError] = useState('');
 
-  // --- Helpers ---
-  const filteredPatients = useMemo(() => {
-    if (!searchQuery.trim()) return [];
-    const q = searchQuery.toLowerCase();
-    return MOCK_PATIENTS.filter(p => 
-      p.name.toLowerCase().includes(q) || 
-      p.mrn.toLowerCase().includes(q) || 
-      p.dob.toLowerCase().includes(q)
-    );
+  // --- Patient search via PatientLookupService ---
+  useEffect(() => {
+    if (!searchQuery.trim()) { setFilteredPatients([]); return; }
+    setPatientSearching(true);
+    const timer = setTimeout(() => {
+      patientService.search(searchQuery).then((results) => {
+        setFilteredPatients(results);
+        setPatientSearching(false);
+      }).catch(() => setPatientSearching(false));
+    }, 300);
+    return () => clearTimeout(timer);
   }, [searchQuery]);
 
   const categories = useMemo(() => Array.from(new Set(MOCK_DME.map(d => d.category))), []);
@@ -49,10 +61,42 @@ export const DMEForm: React.FC<DMEFormProps> = ({ user, onSuccess }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPatient) return alert('Please select a patient');
-    if (!item) return alert('Please select an equipment item');
-    if (!signed) return alert('Please sign the authorization');
+    setSubmitError('');
 
+    // Zod validation
+    const result = dmeFormSchema.safeParse({
+      patientId: selectedPatient?.mrn ?? '',
+      patientName: selectedPatient?.name ?? '',
+      category,
+      item,
+      reqType,
+      delivery,
+      specialFeatures,
+      icd10,
+      secondaryIcd10: secondaryIcd10 || undefined,
+      justification,
+      prescriptionDate,
+      lengthOfNeed: lengthOfNeed || undefined,
+      priorAuth: priorAuth || undefined,
+      urgency: urgency as 'Routine' | 'Urgent' | 'Critical',
+      consents,
+      signed: signed as true,
+    });
+
+    if (!result.success) {
+      const fieldErrors: Record<string, string> = {};
+      result.error.errors.forEach((err) => {
+        const field = err.path[0]?.toString() ?? 'form';
+        if (!fieldErrors[field]) fieldErrors[field] = err.message;
+      });
+      setErrors(fieldErrors);
+      // Scroll to first error
+      const firstKey = Object.keys(fieldErrors)[0];
+      document.getElementById(`dme-${firstKey}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+
+    setErrors({});
     setLoading(true);
     try {
       await firebaseService.submitRequest({
@@ -62,14 +106,15 @@ export const DMEForm: React.FC<DMEFormProps> = ({ user, onSuccess }) => {
         patientName: selectedPatient.name,
         patientId: selectedPatient.mrn,
         details: {
+          kind: 'dme' as const,
           equipment: { category, item, reqType, delivery, specialFeatures },
           clinical: { icd10, secondaryIcd10, justification, prescriptionDate, lengthOfNeed, priorAuth, urgency },
-          consents
-        }
+          consents,
+        },
       });
       onSuccess();
-    } catch (err) {
-      alert('Submission failed');
+    } catch {
+      setSubmitError('Submission failed. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -88,7 +133,13 @@ export const DMEForm: React.FC<DMEFormProps> = ({ user, onSuccess }) => {
         <p className="text-sm text-slate-500 mt-1">Select the patient, choose equipment, and provide clinical details — all other info is pulled from the patient record.</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      {submitError && (
+        <div role="alert" className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl p-4 mb-2">
+          {submitError}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-6" noValidate>
         {/* --- CARD 1: Patient Lookup --- */}
         <section className="bg-white rounded-2xl shadow-lg border border-[#e2e8f0] overflow-hidden animate-[rise_0.35s_ease_both]">
           <div className="px-6 py-4 border-b border-[#e2e8f0] flex items-center gap-3">
@@ -99,7 +150,8 @@ export const DMEForm: React.FC<DMEFormProps> = ({ user, onSuccess }) => {
             <span className="ml-auto text-[0.68rem] font-bold tracking-wider uppercase px-2 py-1 rounded-full bg-red-100 text-red-800">Required</span>
           </div>
           
-          <div className="p-6">
+          <div className="p-6" id="dme-patientId">
+            <FieldError msg={errors.patientId} />
             {!selectedPatient ? (
               <div className="relative">
                 <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
@@ -141,6 +193,8 @@ export const DMEForm: React.FC<DMEFormProps> = ({ user, onSuccess }) => {
                           <div className="px-2 py-1 bg-[#eff4ff] text-[#2563eb] rounded-md text-[0.72rem] font-bold">{p.mrn}</div>
                         </button>
                       ))
+                    ) : patientSearching ? (
+                      <div className="p-4 text-center text-sm text-slate-500 animate-pulse">Searching…</div>
                     ) : (
                       <div className="p-4 text-center text-sm text-slate-500">No patients found.</div>
                     )}
@@ -270,16 +324,18 @@ export const DMEForm: React.FC<DMEFormProps> = ({ user, onSuccess }) => {
           
           <div className="p-6 space-y-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-1.5" id="dme-icd10">
                 <label className="text-[10px] uppercase font-bold text-[#374151] tracking-wider">Primary Diagnosis (ICD-10) <span className="text-red-500">*</span></label>
-                <input 
-                  type="text" 
-                  placeholder="e.g. M17.11 — Osteoarthritis" 
-                  className="w-full px-4 py-2.5 border-[1.5px] border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#2563eb]/10 focus:border-[#2563eb] outline-none transition-all"
+                <input
+                  type="text"
+                  placeholder="e.g. M17.11 — Osteoarthritis"
+                  className={`w-full px-4 py-2.5 border-[1.5px] rounded-xl text-sm focus:ring-2 focus:ring-[#2563eb]/10 focus:border-[#2563eb] outline-none transition-all ${errors.icd10 ? 'border-red-400' : 'border-[#e2e8f0]'}`}
                   value={icd10}
-                  onChange={(e) => setIcd10(e.target.value)}
-                  required
+                  onChange={(e) => { setIcd10(e.target.value); setErrors(p => ({ ...p, icd10: '' })); }}
+                  aria-invalid={!!errors.icd10}
+                  aria-describedby={errors.icd10 ? 'err-icd10' : undefined}
                 />
+                <FieldError msg={errors.icd10} />
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] uppercase font-bold text-[#374151] tracking-wider">Secondary Diagnosis</label>
@@ -293,15 +349,16 @@ export const DMEForm: React.FC<DMEFormProps> = ({ user, onSuccess }) => {
               </div>
             </div>
 
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-1.5" id="dme-justification">
               <label className="text-[10px] uppercase font-bold text-[#374151] tracking-wider">Justification / Limitation <span className="text-red-500">*</span></label>
-              <textarea 
-                className="w-full p-4 border-[1.5px] border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#2563eb]/10 focus:border-[#2563eb] outline-none min-h-[100px] transition-all"
+              <textarea
+                className={`w-full p-4 border-[1.5px] rounded-xl text-sm focus:ring-2 focus:ring-[#2563eb]/10 focus:border-[#2563eb] outline-none min-h-[100px] transition-all ${errors.justification ? 'border-red-400' : 'border-[#e2e8f0]'}`}
                 placeholder="Describe how condition impairs function and why equipment is necessary…"
                 value={justification}
-                onChange={(e) => setJustification(e.target.value)}
-                required
+                onChange={(e) => { setJustification(e.target.value); setErrors(p => ({ ...p, justification: '' })); }}
+                aria-invalid={!!errors.justification}
               />
+              <FieldError msg={errors.justification} />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -400,15 +457,16 @@ export const DMEForm: React.FC<DMEFormProps> = ({ user, onSuccess }) => {
               </div>
             </div>
 
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-1.5" id="dme-signed">
               <label className="text-[10px] uppercase font-bold text-[#374151] tracking-wider">Electronic Signature <span className="text-red-500">*</span></label>
               <button
                 type="button"
-                onClick={() => setSigned(true)}
-                className={`w-full h-20 rounded-xl border-[1.5px] flex items-center justify-center transition-all ${signed ? 'bg-[#f0fdfa] border-[#0d9488] text-[#0d9488] font-bold' : 'bg-[#f0f4f8] border-dashed border-[#e2e8f0] text-slate-400 italic hover:border-[#2563eb]'}`}
+                onClick={() => { setSigned(true); setErrors(p => ({ ...p, signed: '', consents: '' })); }}
+                className={`w-full h-20 rounded-xl border-[1.5px] flex items-center justify-center transition-all ${signed ? 'bg-[#f0fdfa] border-[#0d9488] text-[#0d9488] font-bold' : errors.signed ? 'bg-red-50 border-red-400 text-red-400 italic' : 'bg-[#f0f4f8] border-dashed border-[#e2e8f0] text-slate-400 italic hover:border-[#2563eb]'}`}
               >
                 {signed ? `✓ Signed electronically — ${user.displayName}` : 'Click here to sign electronically'}
               </button>
+              <FieldError msg={errors.signed ?? errors.consents} />
             </div>
           </div>
         </section>
@@ -432,12 +490,6 @@ export const DMEForm: React.FC<DMEFormProps> = ({ user, onSuccess }) => {
         </div>
       </form>
 
-      <style dangerouslySetInnerHTML={{ __html: `
-        @keyframes rise {
-          from { opacity: 0; transform: translateY(12px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-      `}} />
     </div>
   );
 };
