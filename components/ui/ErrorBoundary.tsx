@@ -10,6 +10,7 @@
  */
 
 import React from 'react';
+import { logger } from '../../services/logger';
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
@@ -33,8 +34,9 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    // In Phase 3 this will pipe to Cloud Logging / Sentry.
-    console.error('[ErrorBoundary] Uncaught render error:', error, info.componentStack);
+    logger.critical('ErrorBoundary', 'Uncaught render error', error, {
+      componentStack: import.meta.env.DEV ? info.componentStack : undefined,
+    });
   }
 
   handleReload = () => {

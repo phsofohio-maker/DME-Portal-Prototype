@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Staff } from '../../types';
 import { NotificationBell } from '../Notifications/NotificationBell';
@@ -11,7 +11,9 @@ interface LayoutProps {
 }
 
 /** HIPAA 164.312(a)(2)(iii) — automatic logoff after 15 minutes of inactivity */
-const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000;
+const INACTIVITY_TIMEOUT_MS  = 15 * 60 * 1000;
+/** Show a warning modal 2 minutes before auto-logout */
+const WARNING_BEFORE_MS      =  2 * 60 * 1000;
 
 const Icons = {
   Dashboard: () => (
@@ -69,29 +71,53 @@ const Icons = {
       <line x1="21" x2="9" y1="12" y2="12"/>
     </svg>
   ),
+  Help: () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+      <path d="M12 17h.01"/>
+    </svg>
+  ),
+  GoLive: () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="9 11 12 14 22 4"/>
+      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+    </svg>
+  ),
 };
 
 export const Layout: React.FC<LayoutProps> = ({ user, onLogout, children }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const logoutTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const warningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showTimeoutWarning, setShowTimeoutWarning] = useState(false);
 
   // ── 15-minute inactivity auto-logout (HIPAA 164.312(a)(2)(iii)) ────────────
-  useEffect(() => {
-    const resetTimer = () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(onLogout, INACTIVITY_TIMEOUT_MS);
-    };
+  // Warning modal appears 2 minutes before auto-logout fires.
+  const resetTimer = useCallback(() => {
+    if (logoutTimerRef.current)  clearTimeout(logoutTimerRef.current);
+    if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
+    setShowTimeoutWarning(false);
 
+    warningTimerRef.current = setTimeout(
+      () => setShowTimeoutWarning(true),
+      INACTIVITY_TIMEOUT_MS - WARNING_BEFORE_MS
+    );
+    logoutTimerRef.current = setTimeout(onLogout, INACTIVITY_TIMEOUT_MS);
+  }, [onLogout]);
+
+  useEffect(() => {
     const events = ['mousedown', 'keydown', 'touchstart', 'scroll', 'mousemove'];
     events.forEach((e) => window.addEventListener(e, resetTimer, { passive: true }));
     resetTimer(); // start the clock
 
     return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
+      if (logoutTimerRef.current)  clearTimeout(logoutTimerRef.current);
+      if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
       events.forEach((e) => window.removeEventListener(e, resetTimer));
     };
-  }, [onLogout]);
+  }, [resetTimer]);
 
   const menuItems = [
     { label: 'Dashboard', path: '/', icon: <Icons.Dashboard /> },
@@ -100,11 +126,13 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, children }) => {
     { label: 'Multi-Meds', path: '/request/multi-meds', icon: <Icons.MultiMeds /> },
     { label: 'Messaging', path: '/messaging', icon: <Icons.Messaging /> },
     { label: 'Profile', path: '/profile', icon: <Icons.Profile /> },
+    { label: 'Help', path: '/help', icon: <Icons.Help /> },
   ];
 
   if (user.role === 'admin') {
     menuItems.splice(1, 0, { label: 'Admin Inbox', path: '/admin', icon: <Icons.Inbox /> });
     menuItems.push({ label: 'Team', path: '/admin/team', icon: <Icons.Team /> });
+    menuItems.push({ label: 'Go-Live', path: '/admin/go-live', icon: <Icons.GoLive /> });
   }
 
   return (
@@ -190,6 +218,46 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, children }) => {
       <main className="flex-1 p-4 md:p-8 mb-20 md:mb-0 max-w-5xl mx-auto w-full">
         {children}
       </main>
+
+      {/* ── Session timeout warning modal ── */}
+      {showTimeoutWarning && (
+        <div
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="timeout-warning-title"
+          aria-describedby="timeout-warning-desc"
+          className="fixed inset-0 bg-slate-900/70 flex items-center justify-center p-4 z-[600]"
+        >
+          <div className="bg-white rounded-2xl p-7 w-full max-w-sm shadow-2xl text-center">
+            <div className="w-14 h-14 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <svg className="w-7 h-7 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />
+              </svg>
+            </div>
+            <h2 id="timeout-warning-title" className="text-lg font-bold text-slate-900 mb-2">
+              Session Expiring Soon
+            </h2>
+            <p id="timeout-warning-desc" className="text-sm text-slate-500 mb-6">
+              For HIPAA compliance, your session will automatically end in{' '}
+              <strong>2 minutes</strong> due to inactivity. Click below to stay signed in.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={onLogout}
+                className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-50 transition-colors"
+              >
+                Sign Out Now
+              </button>
+              <button
+                onClick={resetTimer}
+                className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-colors"
+              >
+                Stay Signed In
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
