@@ -190,3 +190,22 @@ export interface AuditLogEntry {
   ipAddress?: string;
   userAgent?: string;
 }
+
+// ─── In-App Notifications ─────────────────────────────────────────────────────
+
+export type NotificationType =
+  | 'request.status_change'
+  | 'message.received'
+  | 'invitation.accepted'
+  | 'admin.action_required';
+
+export interface AppNotification {
+  id: string;
+  recipientId: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  resourceId?: string;
+  read: boolean;
+  createdAt: number;
+}

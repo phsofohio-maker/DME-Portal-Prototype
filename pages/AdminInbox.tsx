@@ -14,6 +14,7 @@ import { firebaseService } from '../services/firebaseService';
 import { RequestList } from '../components/Dashboard/RequestList';
 import { RequestListSkeleton } from '../components/ui/LoadingSkeleton';
 import { adminActionSchema } from '../lib/schemas';
+import { exportRequestPDF } from '../services/pdfService';
 
 interface AdminInboxProps {
   user: Staff;
@@ -212,6 +213,15 @@ export const AdminInbox: React.FC<AdminInboxProps> = ({ user }) => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── Processed Requests (approved / denied) with PDF export ── */}
+      {!loading && (
+        <RequestList
+          title="Processed Requests"
+          requests={requests.filter((r) => r.status === 'approved' || r.status === 'denied')}
+          onExport={exportRequestPDF}
+        />
       )}
     </div>
   );

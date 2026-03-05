@@ -35,6 +35,13 @@ export const MessagingPortal: React.FC<{ currentUser: Staff }> = ({ currentUser 
     return unsubscribe;
   }, [selectedContact, currentUser.uid]);
 
+  // Mark incoming unread messages as read whenever new messages arrive
+  useEffect(() => {
+    messages
+      .filter((m) => m.senderId !== currentUser.uid && !m.read)
+      .forEach((m) => firebaseService.markMessageRead(m.id));
+  }, [messages, currentUser.uid]);
+
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -136,9 +143,9 @@ export const MessagingPortal: React.FC<{ currentUser: Staff }> = ({ currentUser 
                   </p>
                 </div>
               </div>
-              <div className="bg-amber-50 text-amber-700 px-3 py-1.5 rounded-lg border border-amber-100 text-[10px] font-bold flex items-center gap-2">
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-                HIPAA COMPLIANT CHANNEL
+              <div className="bg-slate-50 text-slate-500 px-3 py-1.5 rounded-lg border border-slate-200 text-[10px] font-bold flex items-center gap-2">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                SECURE INTERNAL CHANNEL
               </div>
             </div>
 
@@ -168,8 +175,23 @@ export const MessagingPortal: React.FC<{ currentUser: Staff }> = ({ currentUser 
                       <div className={`p-4 rounded-2xl text-sm shadow-sm transition-all ${msg.senderId === currentUser.uid ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white border border-slate-100 text-slate-700 rounded-tl-none'}`}>
                         {msg.messageBody}
                       </div>
-                      <p className={`text-[9px] mt-1 font-bold text-slate-400 px-1 ${msg.senderId === currentUser.uid ? 'text-right' : 'text-left'}`}>
-                        {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      <p className={`text-[9px] mt-1 font-bold text-slate-400 px-1 flex items-center gap-1 ${msg.senderId === currentUser.uid ? 'justify-end' : 'justify-start'}`}>
+                        <time dateTime={new Date(msg.createdAt).toISOString()}>
+                          {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </time>
+                        {msg.senderId === currentUser.uid && (
+                          <span aria-label={msg.read ? 'Read' : 'Delivered'} title={msg.read ? 'Read' : 'Delivered'}>
+                            {msg.read ? (
+                              <svg className="w-3 h-3 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                              </svg>
+                            ) : (
+                              <svg className="w-3 h-3 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                              </svg>
+                            )}
+                          </span>
+                        )}
                       </p>
                     </div>
                   </div>

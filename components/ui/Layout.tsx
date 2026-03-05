@@ -2,6 +2,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Staff } from '../../types';
+import { NotificationBell } from '../Notifications/NotificationBell';
 
 interface LayoutProps {
   user: Staff;
@@ -139,10 +140,11 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, children }) => {
             <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-sm font-bold shrink-0">
               {user.displayName.charAt(0)}
             </div>
-            <div className="overflow-hidden">
+            <div className="overflow-hidden flex-1">
               <p className="text-sm font-medium truncate">{user.displayName}</p>
               <p className="text-xs text-slate-500 capitalize">{user.role}</p>
             </div>
+            <NotificationBell uid={user.uid} />
           </div>
           <button
             onClick={onLogout}
@@ -157,13 +159,16 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, children }) => {
       {/* Header — Mobile */}
       <header className="md:hidden bg-slate-900 text-white p-4 sticky top-0 z-[200] flex justify-between items-center">
         <h1 className="font-bold text-blue-400">Parrish Portal</h1>
-        <button
-          onClick={onLogout}
-          className="text-sm text-slate-400 flex items-center space-x-1"
-        >
-          <Icons.Logout />
-          <span>Out</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <NotificationBell uid={user.uid} />
+          <button
+            onClick={onLogout}
+            className="text-sm text-slate-400 flex items-center space-x-1"
+          >
+            <Icons.Logout />
+            <span>Out</span>
+          </button>
+        </div>
       </header>
 
       {/* Bottom Nav — Mobile */}

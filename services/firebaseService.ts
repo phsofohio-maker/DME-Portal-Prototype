@@ -47,6 +47,8 @@ import {
   UserRole,
   RequestStatus,
   NotificationPrefs,
+  AppNotification,
+  NotificationType,
 } from '../types';
 import { MOCK_DME, MOCK_PATIENTS } from './mockData';
 
@@ -397,6 +399,80 @@ export const firebaseService = {
       notificationPrefs: prefs,
       updatedAt: Date.now(),
     });
+  },
+
+  // ── In-App Notifications ───────────────────────────────────────────────────
+
+  /**
+   * Creates a notification document in the `notifications` collection.
+   * Called server-side via Cloud Functions; can also be called client-side
+   * as a fallback when Cloud Functions are unavailable in development.
+   */
+  createNotification: async (
+    recipientId: string,
+    type: NotificationType,
+    title: string,
+    body: string,
+    resourceId?: string
+  ): Promise<void> => {
+    await addDoc(collection(db, 'notifications'), {
+      recipientId,
+      type,
+      title,
+      body,
+      resourceId: resourceId ?? null,
+      read: false,
+      createdAt: Date.now(),
+    } satisfies Omit<AppNotification, 'id'>);
+  },
+
+  /**
+   * Real-time listener for a user's unread + recent notifications.
+   * Returns the unsubscribe function for useEffect cleanup.
+   */
+  subscribeToNotifications: (
+    uid: string,
+    callback: (notifications: AppNotification[]) => void
+  ): Unsubscribe => {
+    const q = query(
+      collection(db, 'notifications'),
+      where('recipientId', '==', uid),
+      orderBy('createdAt', 'desc'),
+    );
+    return onSnapshot(q, (snap) => {
+      callback(
+        snap.docs.map((d) => ({ id: d.id, ...d.data() } as AppNotification))
+      );
+    });
+  },
+
+  /**
+   * Mark a single notification as read.
+   */
+  markNotificationRead: async (notificationId: string): Promise<void> => {
+    await updateDoc(doc(db, 'notifications', notificationId), { read: true });
+  },
+
+  /**
+   * Mark all notifications for a user as read.
+   */
+  markAllNotificationsRead: async (uid: string): Promise<void> => {
+    const q = query(
+      collection(db, 'notifications'),
+      where('recipientId', '==', uid),
+      where('read', '==', false)
+    );
+    const snap = await getDocs(q);
+    await Promise.all(snap.docs.map((d) => updateDoc(d.ref, { read: true })));
+  },
+
+  // ── Message read tracking ──────────────────────────────────────────────────
+
+  /**
+   * Mark a message as read when the recipient views the conversation.
+   */
+  markMessageRead: async (messageId: string): Promise<void> => {
+    await updateDoc(doc(db, 'communications', messageId), { read: true });
   },
 
   // ── Timestamp util ─────────────────────────────────────────────────────────

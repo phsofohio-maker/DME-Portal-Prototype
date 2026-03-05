@@ -1,7 +1,8 @@
 
-import React, { useState, useMemo } from 'react';
-import { MOCK_DME, MOCK_PATIENTS } from '../../services/mockData';
-import { Staff } from '../../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { MOCK_DME } from '../../services/mockData';
+import { patientService } from '../../services/patientService';
+import { Staff, Patient } from '../../types';
 import { firebaseService } from '../../services/firebaseService';
 import { dmeFormSchema } from '../../lib/schemas';
 
@@ -16,9 +17,11 @@ interface DMEFormProps {
 
 export const DMEForm: React.FC<DMEFormProps> = ({ user, onSuccess }) => {
   // --- Form State ---
-  const [selectedPatient, setSelectedPatient] = useState<any>(null);
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [filteredPatients, setFilteredPatients] = useState<Patient[]>([]);
+  const [patientSearching, setPatientSearching] = useState(false);
   
   const [category, setCategory] = useState('');
   const [item, setItem] = useState('');
@@ -40,15 +43,17 @@ export const DMEForm: React.FC<DMEFormProps> = ({ user, onSuccess }) => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState('');
 
-  // --- Helpers ---
-  const filteredPatients = useMemo(() => {
-    if (!searchQuery.trim()) return [];
-    const q = searchQuery.toLowerCase();
-    return MOCK_PATIENTS.filter(p => 
-      p.name.toLowerCase().includes(q) || 
-      p.mrn.toLowerCase().includes(q) || 
-      p.dob.toLowerCase().includes(q)
-    );
+  // --- Patient search via PatientLookupService ---
+  useEffect(() => {
+    if (!searchQuery.trim()) { setFilteredPatients([]); return; }
+    setPatientSearching(true);
+    const timer = setTimeout(() => {
+      patientService.search(searchQuery).then((results) => {
+        setFilteredPatients(results);
+        setPatientSearching(false);
+      }).catch(() => setPatientSearching(false));
+    }, 300);
+    return () => clearTimeout(timer);
   }, [searchQuery]);
 
   const categories = useMemo(() => Array.from(new Set(MOCK_DME.map(d => d.category))), []);
@@ -188,6 +193,8 @@ export const DMEForm: React.FC<DMEFormProps> = ({ user, onSuccess }) => {
                           <div className="px-2 py-1 bg-[#eff4ff] text-[#2563eb] rounded-md text-[0.72rem] font-bold">{p.mrn}</div>
                         </button>
                       ))
+                    ) : patientSearching ? (
+                      <div className="p-4 text-center text-sm text-slate-500 animate-pulse">Searching…</div>
                     ) : (
                       <div className="p-4 text-center text-sm text-slate-500">No patients found.</div>
                     )}

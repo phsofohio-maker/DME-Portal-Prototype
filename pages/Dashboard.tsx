@@ -3,6 +3,7 @@ import { Staff, Request } from '../types';
 import { firebaseService } from '../services/firebaseService';
 import { RequestList } from '../components/Dashboard/RequestList';
 import { DashboardSkeleton } from '../components/ui/LoadingSkeleton';
+import { exportRequestPDF } from '../services/pdfService';
 
 interface DashboardProps {
   user: Staff;
@@ -69,7 +70,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         </div>
       </div>
 
-      <RequestList title="Your Recent Submissions" requests={requests} />
+      <RequestList
+        title="Your Recent Submissions"
+        requests={requests}
+        onExport={exportRequestPDF}
+      />
     </div>
   );
 };

@@ -1,11 +1,13 @@
 /**
- * Parrish Health DME Portal — Cloud Functions (Phase 2)
+ * Parrish Health DME Portal — Cloud Functions (Phase 3)
  *
  * Responsibilities:
  *   1. Write immutable audit log entries for every state-changing Firestore
  *      operation (HIPAA Security Rule §164.312(b) — Audit Controls).
  *   2. Send transactional emails via SendGrid when request status changes.
  *   3. Server-side Zod validation on callable functions.
+ *   4. Create in-app notifications in the `notifications` collection when
+ *      a request status changes or a new secure message is received.
  *
  * Environment variables required (set via `firebase functions:config:set` or
  * Secret Manager in production):
@@ -43,6 +45,31 @@ async function getActorRole(uid: string): Promise<string> {
     return snap.exists ? (snap.data()?.role ?? 'unknown') : 'unknown';
   } catch {
     return 'unknown';
+  }
+}
+
+// ─── Helper: create an in-app notification ────────────────────────────────────
+
+async function createNotification(
+  recipientId: string,
+  type: string,
+  title: string,
+  body: string,
+  resourceId?: string
+): Promise<void> {
+  try {
+    await db.collection('notifications').add({
+      recipientId,
+      type,
+      title,
+      body,
+      resourceId: resourceId ?? null,
+      read: false,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+  } catch (err) {
+    console.error('[Notification] Failed to create notification:', err);
+    // Non-fatal — do not throw
   }
 }
 
@@ -175,6 +202,24 @@ export const onRequestUpdated = onDocumentUpdated(
       console.error('[SendGrid] Failed to send status email:', emailErr);
       // Non-fatal — do not throw
     }
+
+    // Create in-app notification for the submitter
+    const submitterId = after.submitterId as string | undefined;
+    if (submitterId) {
+      const statusLabels: Record<string, string> = {
+        approved: 'Approved',
+        denied:   'Denied',
+        rmi:      'More Info Needed',
+      };
+      const label = statusLabels[after.status as string] ?? String(after.status);
+      await createNotification(
+        submitterId,
+        'request.status_change',
+        `Request ${label}`,
+        `Your request for ${(after.patientName as string) ?? 'a patient'} has been ${label.toLowerCase()}.`,
+        event.params.requestId
+      );
+    }
   }
 );
 
@@ -252,6 +297,19 @@ export const onMessageCreated = onDocumentCreated(
         createdAt:    data.createdAt,
       },
     });
+
+    // Create in-app notification for the recipient
+    const recipientId = data.recipientId as string | undefined;
+    const senderName  = data.senderName  as string | undefined;
+    if (recipientId && senderName) {
+      await createNotification(
+        recipientId,
+        'message.received',
+        `New message from ${senderName}`,
+        'You have a new secure message. Click to view.',
+        event.params.msgId
+      );
+    }
   }
 );
 

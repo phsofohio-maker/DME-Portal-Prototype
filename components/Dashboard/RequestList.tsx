@@ -6,6 +6,7 @@ import { RequestListSkeleton } from '../ui/LoadingSkeleton';
 interface RequestListProps {
   requests: Request[];
   onSelect?: (req: Request) => void;
+  onExport?: (req: Request) => void;
   title: string;
   isLoading?: boolean;
 }
@@ -18,7 +19,7 @@ const Icons = {
   Empty: () => <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
 };
 
-export const RequestList: React.FC<RequestListProps> = ({ requests, onSelect, title, isLoading = false }) => {
+export const RequestList: React.FC<RequestListProps> = ({ requests, onSelect, onExport, title, isLoading = false }) => {
   if (isLoading) return <RequestListSkeleton title={title} />;
 
   const getStatusColor = (status: string) => {
@@ -71,7 +72,7 @@ export const RequestList: React.FC<RequestListProps> = ({ requests, onSelect, ti
                 <th scope="col" className="px-6 py-3">Patient</th>
                 <th scope="col" className="px-6 py-3">Status</th>
                 <th scope="col" className="px-6 py-3">Submitted</th>
-                {onSelect && <th scope="col" className="px-6 py-3">Action</th>}
+                {(onSelect || onExport) && <th scope="col" className="px-6 py-3">Action</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -100,15 +101,30 @@ export const RequestList: React.FC<RequestListProps> = ({ requests, onSelect, ti
                       {new Date(req.createdAt).toLocaleDateString()}
                     </time>
                   </td>
-                  {onSelect && (
-                    <td className="px-6 py-4">
-                      <button
-                        onClick={() => onSelect(req)}
-                        className="text-blue-600 hover:underline font-medium"
-                        aria-label={`View details for ${req.patientName} request`}
-                      >
-                        Details
-                      </button>
+                  {(onSelect || onExport) && (
+                    <td className="px-6 py-4 flex items-center gap-2">
+                      {onSelect && (
+                        <button
+                          onClick={() => onSelect(req)}
+                          className="text-blue-600 hover:underline font-medium"
+                          aria-label={`View details for ${req.patientName} request`}
+                        >
+                          Details
+                        </button>
+                      )}
+                      {onExport && req.status === 'approved' && (
+                        <button
+                          onClick={() => onExport(req)}
+                          className="text-green-600 hover:underline font-medium flex items-center gap-1"
+                          aria-label={`Export PDF for ${req.patientName} request`}
+                          title="Export approved request as PDF"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                          </svg>
+                          PDF
+                        </button>
+                      )}
                     </td>
                   )}
                 </tr>

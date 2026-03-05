@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { MOCK_PATIENTS } from '../../services/mockData';
-import { Staff } from '../../types';
+import React, { useState, useEffect, useRef } from 'react';
+import { patientService } from '../../services/patientService';
+import { Staff, Patient } from '../../types';
 import { firebaseService } from '../../services/firebaseService';
 import { multiMedicationFormSchema } from '../../lib/schemas';
 
@@ -33,9 +33,11 @@ interface MultiMedicationFormProps {
 
 export const MultiMedicationForm: React.FC<MultiMedicationFormProps> = ({ user, onSuccess }) => {
   // --- Patient State ---
-  const [selectedPatient, setSelectedPatient] = useState<any>(null);
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [patientSearchQuery, setPatientSearchQuery] = useState('');
   const [isPatientDropdownOpen, setIsPatientDropdownOpen] = useState(false);
+  const [filteredPatients, setFilteredPatients] = useState<Patient[]>([]);
+  const [patientSearching, setPatientSearching] = useState(false);
 
   // --- Medications State ---
   const [meds, setMeds] = useState<MedicationRow[]>([]);
@@ -77,14 +79,17 @@ export const MultiMedicationForm: React.FC<MultiMedicationFormProps> = ({ user, 
     checkApi();
   }, []);
 
-  // --- Patient Search Logic ---
-  const filteredPatients = useMemo(() => {
-    if (!patientSearchQuery.trim()) return [];
-    const q = patientSearchQuery.toLowerCase();
-    return MOCK_PATIENTS.filter(p => 
-      p.name.toLowerCase().includes(q) || 
-      p.mrn.toLowerCase().includes(q)
-    );
+  // --- Patient search via PatientLookupService ---
+  useEffect(() => {
+    if (!patientSearchQuery.trim()) { setFilteredPatients([]); return; }
+    setPatientSearching(true);
+    const timer = setTimeout(() => {
+      patientService.search(patientSearchQuery).then((results) => {
+        setFilteredPatients(results);
+        setPatientSearching(false);
+      }).catch(() => setPatientSearching(false));
+    }, 300);
+    return () => clearTimeout(timer);
   }, [patientSearchQuery]);
 
   // --- Med Row Management ---
@@ -331,6 +336,8 @@ export const MultiMedicationForm: React.FC<MultiMedicationFormProps> = ({ user, 
                           <div className="px-2 py-1 bg-[#eff4ff] text-[#2563eb] rounded-md text-[0.72rem] font-bold">{p.insurance}</div>
                         </button>
                       ))
+                    ) : patientSearching ? (
+                      <div className="p-4 text-center text-sm text-slate-500 animate-pulse">Searching…</div>
                     ) : (
                       <div className="p-4 text-center text-sm text-slate-500">No patients found.</div>
                     )}
