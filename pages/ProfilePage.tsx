@@ -28,7 +28,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ user, onUpdate }) => {
         <h2 className="text-xl font-bold mb-6 serif">User Profile</h2>
         <dl className="space-y-4">
           {[
-            { label: 'Name', value: user.displayName },
+            { label: 'Name',  value: user.displayName },
             { label: 'Email', value: user.email },
           ].map(({ label, value }) => (
             <div key={label} className="flex justify-between py-2 border-b border-slate-50">
@@ -48,6 +48,12 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ user, onUpdate }) => {
             <div className="flex justify-between py-2 border-b border-slate-50">
               <dt className="text-slate-500 text-sm">Department</dt>
               <dd className="font-bold text-slate-800">{user.department}</dd>
+            </div>
+          )}
+          {user.phoneNumber && (
+            <div className="flex justify-between py-2 border-b border-slate-50">
+              <dt className="text-slate-500 text-sm">Phone</dt>
+              <dd className="font-bold text-slate-800">{user.phoneNumber}</dd>
             </div>
           )}
         </dl>
@@ -79,7 +85,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ user, onUpdate }) => {
             <p className="text-xs text-slate-500">Manage when you receive external alerts.</p>
           </div>
           {savingPrefs && (
-            <div className="ml-auto text-[10px] text-blue-500 font-bold animate-pulse" aria-live="polite">
+            <div className="ml-auto text-[10px] text-blue-500 font-bold animate-pulse" role="status" aria-live="polite">
               Saving…
             </div>
           )}
