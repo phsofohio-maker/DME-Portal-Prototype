@@ -18,6 +18,7 @@
 import React, { useState, useEffect } from 'react';
 import { firebaseService } from '../services/firebaseService';
 import { Request } from '../types';
+import { AnalyticsSkeleton } from '../components/ui/LoadingSkeleton';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -209,9 +210,7 @@ export const AnalyticsPage: React.FC = () => {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-24" role="status" aria-label="Loading analytics">
-          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" aria-hidden="true" />
-        </div>
+        <AnalyticsSkeleton />
       ) : error ? (
         <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-center">
           <p className="text-red-600 text-sm font-medium">{error}</p>

@@ -15,6 +15,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { firebaseService } from '../services/firebaseService';
 import { AuditLogEntry, AuditAction } from '../types';
 import { DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
+import { AuditLogSkeleton } from '../components/ui/LoadingSkeleton';
 
 // ─── Action label map ─────────────────────────────────────────────────────────
 
@@ -223,9 +224,7 @@ export const AuditLogPage: React.FC = () => {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-16" role="status" aria-label="Loading audit log">
-            <div className="w-7 h-7 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" aria-hidden="true" />
-          </div>
+          <AuditLogSkeleton rows={8} />
         ) : error ? (
           <div className="px-6 py-12 text-center">
             <p className="text-red-600 text-sm font-medium">{error}</p>
@@ -247,13 +246,18 @@ export const AuditLogPage: React.FC = () => {
       {/* Load more */}
       {hasMore && !loading && (
         <div className="flex justify-center">
-          <button
-            onClick={() => load(filterAction, true)}
-            disabled={loadingMore}
-            className="px-6 py-2.5 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50"
-          >
-            {loadingMore ? 'Loading…' : 'Load more entries'}
-          </button>
+          {loadingMore ? (
+            <div className="w-full bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <AuditLogSkeleton rows={5} />
+            </div>
+          ) : (
+            <button
+              onClick={() => load(filterAction, true)}
+              className="px-6 py-2.5 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+            >
+              Load more entries
+            </button>
+          )}
         </div>
       )}
 
