@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Staff } from '../../types';
 import { NotificationBell } from '../Notifications/NotificationBell';
+import { OfflineBanner } from './OfflineBanner';
 
 interface LayoutProps {
   user: Staff;
@@ -232,9 +233,12 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, children }) => {
         ))}
       </nav>
 
-      <main className="flex-1 p-4 md:p-8 mb-20 md:mb-0 max-w-5xl mx-auto w-full">
-        {children}
-      </main>
+      <div className="flex-1 flex flex-col min-w-0">
+        <OfflineBanner />
+        <main className="flex-1 p-4 md:p-8 mb-20 md:mb-0 max-w-5xl mx-auto w-full">
+          {children}
+        </main>
+      </div>
 
       {/* ── Session timeout warning modal ── */}
       {showTimeoutWarning && (
