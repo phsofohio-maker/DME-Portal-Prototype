@@ -42,6 +42,7 @@ import {
 } from 'firebase/firestore';
 
 import { auth, db } from './firebase';
+import { retryWithBackoff } from '../utils/retryWithBackoff';
 import {
   Staff,
   Request,
@@ -106,10 +107,10 @@ export const firebaseService = {
   },
 
   updateStaff: async (uid: string, updates: Partial<Staff>): Promise<void> => {
-    await updateDoc(doc(db, 'staff', uid), {
-      ...updates,
-      updatedAt: Date.now(),
-    });
+    await retryWithBackoff(
+      () => updateDoc(doc(db, 'staff', uid), { ...updates, updatedAt: Date.now() }),
+      'updateStaff'
+    );
   },
 
   /**
@@ -187,12 +188,15 @@ export const firebaseService = {
     request: Omit<Request, 'id' | 'createdAt' | 'updatedAt' | 'status'>
   ): Promise<string> => {
     const now = Date.now();
-    const ref = await addDoc(collection(db, 'requests'), {
-      ...request,
-      status: 'pending',
-      createdAt: now,
-      updatedAt: now,
-    });
+    const ref = await retryWithBackoff(
+      () => addDoc(collection(db, 'requests'), {
+        ...request,
+        status: 'pending',
+        createdAt: now,
+        updatedAt: now,
+      }),
+      'submitRequest'
+    );
     return ref.id;
   },
 
@@ -217,7 +221,10 @@ export const firebaseService = {
       updatedAt: Date.now(),
     };
     if (rmiNotes !== undefined) update['rmiNotes'] = rmiNotes;
-    await updateDoc(doc(db, 'requests', requestId), update);
+    await retryWithBackoff(
+      () => updateDoc(doc(db, 'requests', requestId), update),
+      'updateRequestStatus'
+    );
   },
 
   /**
@@ -334,11 +341,14 @@ export const firebaseService = {
   sendMessage: async (
     message: Omit<Communication, 'id' | 'createdAt' | 'read'>
   ): Promise<void> => {
-    await addDoc(collection(db, 'communications'), {
-      ...message,
-      read: false,
-      createdAt: Date.now(),
-    });
+    await retryWithBackoff(
+      () => addDoc(collection(db, 'communications'), {
+        ...message,
+        read: false,
+        createdAt: Date.now(),
+      }),
+      'sendMessage'
+    );
   },
 
   // ── Notifications (simulated — Phase 2 will wire SendGrid) ────────────────
@@ -400,10 +410,10 @@ export const firebaseService = {
   },
 
   updateNotificationPrefs: async (uid: string, prefs: NotificationPrefs): Promise<void> => {
-    await updateDoc(doc(db, 'staff', uid), {
-      notificationPrefs: prefs,
-      updatedAt: Date.now(),
-    });
+    await retryWithBackoff(
+      () => updateDoc(doc(db, 'staff', uid), { notificationPrefs: prefs, updatedAt: Date.now() }),
+      'updateNotificationPrefs'
+    );
   },
 
   // ── In-App Notifications ───────────────────────────────────────────────────
