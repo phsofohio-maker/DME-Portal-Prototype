@@ -154,6 +154,63 @@ async function createNotification(
   }
 }
 
+// ─── Helper: notify admins of a new submission ────────────────────────────────
+
+/**
+ * Fetches all active admin staff documents and sends a new-submission email to
+ * each admin whose notificationPrefs.emailOnStatusChange is true.
+ *
+ * HIPAA note: email contains only patient name and submitter name (no clinical
+ * details). Admins must log in to the portal to view full request content.
+ */
+async function notifyAdminsOfNewRequest(
+  requestId: string,
+  submitterName: string,
+  patientName: string,
+  requestType: string
+): Promise<void> {
+  if (!SENDGRID_API_KEY) {
+    console.log(`[SendGrid SKIPPED — no API key] New request ${requestId} by ${submitterName}`);
+    return;
+  }
+
+  try {
+    const adminsSnap = await db
+      .collection('staff')
+      .where('role', '==', 'admin')
+      .where('status', '==', 'active')
+      .get();
+
+    const sends = adminsSnap.docs
+      .filter((doc) => doc.data()?.notificationPrefs?.emailOnStatusChange === true)
+      .map((doc) => {
+        const admin = doc.data();
+        return sgMail.send({
+          to: admin.email as string,
+          from: SENDGRID_FROM,
+          subject: '[Parrish Portal] New Request Submitted',
+          text: [
+            `Hello ${admin.displayName as string},`,
+            '',
+            `A new ${requestType.toUpperCase()} request has been submitted.`,
+            '',
+            `Patient: ${patientName}`,
+            `Submitted by: ${submitterName}`,
+            '',
+            'Please log in to the Admin Inbox to review and process this request.',
+            '',
+            '— Parrish Health Staff Portal',
+          ].join('\n'),
+        });
+      });
+
+    await Promise.allSettled(sends);
+  } catch (err) {
+    console.error('[SendGrid] Failed to notify admins of new request:', err);
+    // Non-fatal
+  }
+}
+
 // ─── Helper: send status-change email via SendGrid ────────────────────────────
 
 async function sendStatusEmail(
@@ -212,6 +269,7 @@ export const onRequestCreated = onDocumentCreated(
     const actorId = data.submitterId as string;
     const actorRole = await getActorRole(actorId);
 
+    // Write audit log
     await db.collection('audit_log').add({
       timestamp:    FieldValue.serverTimestamp(),
       actorId,
@@ -221,6 +279,14 @@ export const onRequestCreated = onDocumentCreated(
       resourceId:   event.params.requestId,
       after:        data,
     });
+
+    // Notify admins of new submission
+    await notifyAdminsOfNewRequest(
+      event.params.requestId,
+      (data.submitterName as string) ?? 'Unknown',
+      (data.patientName   as string) ?? 'Unknown',
+      (data.type          as string) ?? 'unknown'
+    );
   }
 );
 
@@ -379,7 +445,7 @@ export const onMessageCreated = onDocumentCreated(
       },
     });
 
-    // Create in-app notification for the recipient
+    // Create in-app notification and send email to the recipient
     const recipientId = data.recipientId as string | undefined;
     const senderName  = data.senderName  as string | undefined;
     if (recipientId && senderName) {
@@ -390,6 +456,34 @@ export const onMessageCreated = onDocumentCreated(
         'You have a new secure message. Click to view.',
         event.params.msgId
       );
+
+      // Email the recipient if they have emailOnNewMessage enabled
+      try {
+        if (SENDGRID_API_KEY) {
+          const recipientSnap = await db.doc(`staff/${recipientId}`).get();
+          const recipient = recipientSnap.data();
+          if (recipient?.notificationPrefs?.emailOnNewMessage && recipient?.email) {
+            await sgMail.send({
+              to: recipient.email as string,
+              from: SENDGRID_FROM,
+              subject: `[Parrish Portal] New secure message from ${senderName}`,
+              text: [
+                `Hello ${recipient.displayName as string},`,
+                '',
+                `You have a new secure message from ${senderName}.`,
+                '',
+                'HIPAA reminder: do not reply to this email. Log in to the portal to read and',
+                'respond through the secure HIPAA-compliant messaging channel.',
+                '',
+                '— Parrish Health Staff Portal',
+              ].join('\n'),
+            });
+          }
+        }
+      } catch (emailErr) {
+        console.error('[SendGrid] Failed to send message notification email:', emailErr);
+        // Non-fatal
+      }
     }
   }
 );

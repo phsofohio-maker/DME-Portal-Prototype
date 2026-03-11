@@ -413,37 +413,10 @@ export const firebaseService = {
     );
   },
 
-  // ── Notifications (simulated — Phase 2 will wire SendGrid) ────────────────
-
-  simulateEmail: (to: string, subject: string, body: string) => {
-    console.log(
-      `%c[EMAIL SERVICE] To: ${to}\nSubject: ${subject}\nBody: ${body}`,
-      'color: #2563eb; font-weight: bold;'
-    );
-  },
-
-  notifyUser: async (userId: string, type: 'status' | 'message', data: Record<string, unknown>): Promise<void> => {
-    const recipient = await firebaseService.getStaffProfile(userId);
-    if (!recipient?.notificationPrefs) return;
-
-    if (type === 'status' && recipient.notificationPrefs.emailOnStatusChange) {
-      firebaseService.simulateEmail(
-        recipient.email,
-        `Request Update — Parrish Portal`,
-        `Hello ${recipient.displayName},\n\nYour request for patient ${data['patientName']} has been ${String(data['status']).toUpperCase()}.\n\nAdmin notes: ${data['adminNotes'] ?? 'None'}\n\nLog in to the portal for details.`
-      );
-    }
-
-    if (type === 'message' && recipient.notificationPrefs.emailOnNewMessage) {
-      firebaseService.simulateEmail(
-        recipient.email,
-        `New Message — Parrish Portal`,
-        `Hello ${recipient.displayName},\n\nYou have a new message from ${data['senderName']}.\n\nLog in to reply.`
-      );
-    }
-  },
-
   // ── Catalog & Patient Seeding (run once by an admin) ─────────────────────
+  // Note: email notifications are handled server-side by Cloud Functions
+  // (onRequestUpdated, onRequestCreated, onMessageCreated in functions/src/index.ts).
+  // The client does not need to send emails directly.
 
   /**
    * Seeds the dme_catalog and patients Firestore collections from mock data.
