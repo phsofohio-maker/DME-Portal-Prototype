@@ -440,27 +440,27 @@ export const MedicationForm: React.FC<MedicationFormProps> = ({ user, onSuccess 
           <div className="p-6 space-y-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] uppercase font-bold text-[#374151] tracking-wider">ICD-10 Diagnosis <span className="text-red-500">*</span></label>
-                <input type="text" placeholder="e.g. E11.9 — Type 2 Diabetes" className="w-full px-4 py-2.5 border-[1.5px] border-[#e2e8f0] rounded-xl text-sm outline-none focus:border-[#2563eb]" value={icd10} onChange={e => setIcd10(e.target.value)} required />
+                <label htmlFor="med-icd10" className="text-[10px] uppercase font-bold text-[#374151] tracking-wider">ICD-10 Diagnosis <span className="text-red-500" aria-hidden="true">*</span></label>
+                <input id="med-icd10" type="text" placeholder="e.g. E11.9 — Type 2 Diabetes" className="w-full px-4 py-2.5 border-[1.5px] border-[#e2e8f0] rounded-xl text-sm outline-none focus:border-[#2563eb]" value={icd10} onChange={e => setIcd10(e.target.value)} required aria-required="true" />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] uppercase font-bold text-[#374151] tracking-wider">Indication <span className="text-red-500">*</span></label>
-                <input type="text" placeholder="Reason for medication" className="w-full px-4 py-2.5 border-[1.5px] border-[#e2e8f0] rounded-xl text-sm outline-none focus:border-[#2563eb]" value={indication} onChange={e => setIndication(e.target.value)} required />
+                <label htmlFor="med-indication" className="text-[10px] uppercase font-bold text-[#374151] tracking-wider">Indication <span className="text-red-500" aria-hidden="true">*</span></label>
+                <input id="med-indication" type="text" placeholder="Reason for medication" className="w-full px-4 py-2.5 border-[1.5px] border-[#e2e8f0] rounded-xl text-sm outline-none focus:border-[#2563eb]" value={indication} onChange={e => setIndication(e.target.value)} required aria-required="true" />
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="flex flex-col gap-1.5 sm:col-span-1">
-                <label className="text-[10px] uppercase font-bold text-[#374151] tracking-wider">Sig (Instructions) <span className="text-red-500">*</span></label>
-                <input type="text" placeholder="1 tab PO daily" className="w-full px-4 py-2.5 border-[1.5px] border-[#e2e8f0] rounded-xl text-sm outline-none focus:border-[#2563eb]" value={sig} onChange={e => setSig(e.target.value)} required />
+                <label htmlFor="med-sig" className="text-[10px] uppercase font-bold text-[#374151] tracking-wider">Sig (Instructions) <span className="text-red-500" aria-hidden="true">*</span></label>
+                <input id="med-sig" type="text" placeholder="1 tab PO daily" className="w-full px-4 py-2.5 border-[1.5px] border-[#e2e8f0] rounded-xl text-sm outline-none focus:border-[#2563eb]" value={sig} onChange={e => setSig(e.target.value)} required aria-required="true" />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] uppercase font-bold text-[#374151] tracking-wider">Quantity <span className="text-red-500">*</span></label>
-                <input type="number" placeholder="30" className="w-full px-4 py-2.5 border-[1.5px] border-[#e2e8f0] rounded-xl text-sm outline-none focus:border-[#2563eb]" value={quantity} onChange={e => setQuantity(e.target.value)} required />
+                <label htmlFor="med-quantity" className="text-[10px] uppercase font-bold text-[#374151] tracking-wider">Quantity <span className="text-red-500" aria-hidden="true">*</span></label>
+                <input id="med-quantity" type="number" placeholder="30" className="w-full px-4 py-2.5 border-[1.5px] border-[#e2e8f0] rounded-xl text-sm outline-none focus:border-[#2563eb]" value={quantity} onChange={e => setQuantity(e.target.value)} required aria-required="true" />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] uppercase font-bold text-[#374151] tracking-wider">Refills</label>
-                <select className="w-full px-4 py-2.5 border-[1.5px] border-[#e2e8f0] rounded-xl text-sm outline-none" value={refills} onChange={e => setRefills(e.target.value)}>
+                <label htmlFor="med-refills" className="text-[10px] uppercase font-bold text-[#374151] tracking-wider">Refills</label>
+                <select id="med-refills" className="w-full px-4 py-2.5 border-[1.5px] border-[#e2e8f0] rounded-xl text-sm outline-none" value={refills} onChange={e => setRefills(e.target.value)}>
                   <option>0 (No refills)</option><option>1</option><option>2</option><option>3</option><option>5</option><option>11 (1 year)</option>
                 </select>
               </div>
@@ -468,24 +468,25 @@ export const MedicationForm: React.FC<MedicationFormProps> = ({ user, onSuccess 
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] uppercase font-bold text-[#374151] tracking-wider">Start Date <span className="text-red-500">*</span></label>
-                <input type="date" className="w-full px-4 py-2.5 border-[1.5px] border-[#e2e8f0] rounded-xl text-sm" value={startDate} onChange={e => setStartDate(e.target.value)} required />
+                <label htmlFor="med-start-date" className="text-[10px] uppercase font-bold text-[#374151] tracking-wider">Start Date <span className="text-red-500" aria-hidden="true">*</span></label>
+                <input id="med-start-date" type="date" className="w-full px-4 py-2.5 border-[1.5px] border-[#e2e8f0] rounded-xl text-sm" value={startDate} onChange={e => setStartDate(e.target.value)} required aria-required="true" />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] uppercase font-bold text-[#374151] tracking-wider">Days Supply</label>
-                <select className="w-full px-4 py-2.5 border-[1.5px] border-[#e2e8f0] rounded-xl text-sm" value={daysSupply} onChange={e => setDaysSupply(e.target.value)}>
+                <label htmlFor="med-days-supply" className="text-[10px] uppercase font-bold text-[#374151] tracking-wider">Days Supply</label>
+                <select id="med-days-supply" className="w-full px-4 py-2.5 border-[1.5px] border-[#e2e8f0] rounded-xl text-sm" value={daysSupply} onChange={e => setDaysSupply(e.target.value)}>
                   <option>30 days</option><option>60 days</option><option>90 days</option><option>As directed</option>
                 </select>
               </div>
             </div>
 
             <div className="flex flex-col gap-2">
-              <label className="text-[10px] uppercase font-bold text-[#374151] tracking-wider">Route of Administration</label>
-              <div className="flex flex-wrap gap-2">
+              <span id="med-route-label" className="text-[10px] uppercase font-bold text-[#374151] tracking-wider">Route of Administration</span>
+              <div role="group" aria-labelledby="med-route-label" className="flex flex-wrap gap-2">
                 {['Oral (PO)', 'Sublingual (SL)', 'Topical', 'Inhaled', 'Injection (IM/SC)', 'IV / Infusion'].map(r => (
                   <button
                     key={r}
                     type="button"
+                    aria-pressed={route === r}
                     onClick={() => setRoute(r)}
                     className={`px-4 py-1.5 rounded-full text-xs font-semibold border-[1.5px] transition-all ${route === r ? 'bg-[#eff4ff] border-[#2563eb] text-[#2563eb]' : 'border-[#e2e8f0] text-slate-400 hover:border-[#2563eb] hover:text-[#2563eb]'}`}
                   >
@@ -496,8 +497,8 @@ export const MedicationForm: React.FC<MedicationFormProps> = ({ user, onSuccess 
             </div>
 
             <div className="flex flex-col gap-2">
-              <label className="text-[10px] uppercase font-bold text-[#374151] tracking-wider">Urgency <span className="text-red-500">*</span></label>
-              <div className="grid grid-cols-3 gap-3">
+              <span id="med-urgency-label" className="text-[10px] uppercase font-bold text-[#374151] tracking-wider">Urgency <span className="text-red-500" aria-hidden="true">*</span></span>
+              <div role="group" aria-labelledby="med-urgency-label" className="grid grid-cols-3 gap-3">
                 {[
                   { label: 'Routine', color: 'teal', desc: '24–48 hrs' },
                   { label: 'Urgent', color: 'amber', desc: 'Same-day' },
@@ -506,15 +507,16 @@ export const MedicationForm: React.FC<MedicationFormProps> = ({ user, onSuccess 
                   <button
                     key={u.label}
                     type="button"
+                    aria-pressed={urgency === u.label}
                     onClick={() => setUrgency(u.label)}
                     className={`p-3 border-[1.5px] rounded-2xl text-left transition-all ${
-                      urgency === u.label 
+                      urgency === u.label
                       ? u.color === 'teal' ? 'bg-[#f0fdfa] border-[#0d9488]' : u.color === 'amber' ? 'bg-[#fffbeb] border-[#d97706]' : 'bg-[#fff5f5] border-[#dc2626]'
                       : 'border-[#e2e8f0] hover:shadow-md'
                     }`}
                   >
                     <div className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${
-                      urgency === u.label 
+                      urgency === u.label
                       ? u.color === 'teal' ? 'text-[#0d9488]' : u.color === 'amber' ? 'text-[#d97706]' : 'text-[#dc2626]'
                       : 'text-slate-400'
                     }`}>{u.label}</div>
@@ -537,7 +539,7 @@ export const MedicationForm: React.FC<MedicationFormProps> = ({ user, onSuccess 
           </div>
           
           <div className="p-6 space-y-4">
-            <div className="space-y-2">
+            <div role="group" aria-label="Authorization consents" className="space-y-2">
               {[
                 "I certify this medication is clinically appropriate and the information provided is accurate.",
                 "I have reviewed the patient's allergy list and confirmed no known contraindications.",
@@ -546,6 +548,8 @@ export const MedicationForm: React.FC<MedicationFormProps> = ({ user, onSuccess 
                 <button
                   key={i}
                   type="button"
+                  role="checkbox"
+                  aria-checked={consents[i]}
                   onClick={() => {
                     const next = [...consents];
                     next[i] = !next[i];
@@ -553,7 +557,7 @@ export const MedicationForm: React.FC<MedicationFormProps> = ({ user, onSuccess 
                   }}
                   className={`w-full flex items-start gap-4 p-3 rounded-xl border-[1.5px] text-left text-[0.82rem] transition-all group ${consents[i] ? 'bg-[#f0fdfa] border-[#0d9488] text-[#162d4e]' : 'border-[#e2e8f0] text-slate-500 hover:border-[#2563eb]'}`}
                 >
-                  <div className={`w-4.5 h-4.5 rounded flex-shrink-0 flex items-center justify-center mt-0.5 border-2 ${consents[i] ? 'bg-[#0d9488] border-[#0d9488]' : 'bg-white border-[#e2e8f0]'}`}>
+                  <div aria-hidden="true" className={`w-4.5 h-4.5 rounded flex-shrink-0 flex items-center justify-center mt-0.5 border-2 ${consents[i] ? 'bg-[#0d9488] border-[#0d9488]' : 'bg-white border-[#e2e8f0]'}`}>
                     {consents[i] && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4"><polyline points="20 6 9 17 4 12"/></svg>}
                   </div>
                   <span>{text}</span>
