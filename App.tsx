@@ -21,6 +21,8 @@ const AdminInbox         = lazy(() => import('./pages/AdminInbox').then((m) => (
 const ProfilePage        = lazy(() => import('./pages/ProfilePage').then((m) => ({ default: m.ProfilePage })));
 const HelpPage           = lazy(() => import('./pages/HelpPage').then((m) => ({ default: m.HelpPage })));
 const GoLivePage         = lazy(() => import('./pages/GoLivePage').then((m) => ({ default: m.GoLivePage })));
+const AuditLogPage       = lazy(() => import('./pages/AuditLogPage').then((m) => ({ default: m.AuditLogPage })));
+const AnalyticsPage      = lazy(() => import('./pages/AnalyticsPage').then((m) => ({ default: m.AnalyticsPage })));
 const DMEForm            = lazy(() => import('./components/Forms/DMEForm').then((m) => ({ default: m.DMEForm })));
 const MedicationForm     = lazy(() => import('./components/Forms/MedicationForm').then((m) => ({ default: m.MedicationForm })));
 const MultiMedicationForm = lazy(() => import('./components/Forms/MultiMedicationForm').then((m) => ({ default: m.MultiMedicationForm })));
@@ -129,6 +131,8 @@ export default function App() {
                     element={<UserManagement currentUser={user} />}
                   />
                   <Route path="/admin/go-live" element={<GoLivePage />} />
+                  <Route path="/admin/audit-log" element={<AuditLogPage />} />
+                  <Route path="/admin/analytics" element={<AnalyticsPage />} />
                 </>
               )}
               <Route path="*" element={<Navigate to="/" />} />

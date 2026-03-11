@@ -116,7 +116,25 @@ export const logger = {
       errorMeta['error'] = { name: error.name, message: error.message };
     }
     emit(buildEntry('CRITICAL', context, message, errorMeta));
-    // TODO(Phase 5): trigger PagerDuty / Slack alert via Cloud Function
+
+    // Phase 5: fire-and-forget Slack alert via Cloud Function endpoint.
+    // The endpoint URL is set via VITE_ALERT_ENDPOINT in the environment.
+    // If the env var is not set (dev / staging), this is a no-op.
+    const alertEndpoint = import.meta.env['VITE_ALERT_ENDPOINT'] as string | undefined;
+    if (alertEndpoint && !isDev) {
+      fetch(alertEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          level: 'critical',
+          context,
+          message,
+          metadata: errorMeta,
+        }),
+      }).catch(() => {
+        // Intentionally silent — alerting must never crash the app
+      });
+    }
   },
 
   /**
