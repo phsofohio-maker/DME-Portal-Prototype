@@ -146,6 +146,12 @@ export interface Request {
   updatedAt: number;
   processedBy?: string;
   processedAt?: number;
+  // Escalation fields (Phase 2 §5.3)
+  escalatedTo?: string;
+  escalatedToName?: string;
+  escalatedAt?: number;
+  flaggedForSupervisor?: boolean;
+  escalationNote?: string;
 }
 
 export interface Communication {
@@ -168,6 +174,9 @@ export type AuditAction =
   | 'request.deny'
   | 'request.rmi'
   | 'request.update'
+  | 'request.escalate'
+  | 'request.bulk_approve'
+  | 'request.bulk_deny'
   | 'staff.create'
   | 'staff.update'
   | 'staff.suspend'

@@ -200,6 +200,68 @@ export const firebaseService = {
     return ref.id;
   },
 
+  /**
+   * Escalate a request: assign to a specific admin and/or flag for supervisor review.
+   * Escalation is additive — it does not change the request status.
+   */
+  escalateRequest: async (
+    requestId: string,
+    escalatedTo?: string,
+    escalatedToName?: string,
+    flaggedForSupervisor?: boolean,
+    escalationNote?: string
+  ): Promise<void> => {
+    const update: Record<string, unknown> = {
+      escalatedAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    if (escalatedTo) {
+      update['escalatedTo'] = escalatedTo;
+      update['escalatedToName'] = escalatedToName ?? '';
+    }
+    if (flaggedForSupervisor !== undefined) update['flaggedForSupervisor'] = flaggedForSupervisor;
+    if (escalationNote) update['escalationNote'] = escalationNote;
+    await retryWithBackoff(
+      () => updateDoc(doc(db, 'requests', requestId), update),
+      'escalateRequest'
+    );
+  },
+
+  /**
+   * Bulk approve or deny multiple requests in parallel.
+   * All updates use retryWithBackoff — partial failures are surfaced via Promise.allSettled.
+   */
+  bulkUpdateRequestStatus: async (
+    requestIds: string[],
+    status: 'approved' | 'denied',
+    adminNotes: string,
+    adminId: string
+  ): Promise<{ succeeded: string[]; failed: string[] }> => {
+    const now = Date.now();
+    const results = await Promise.allSettled(
+      requestIds.map((id) =>
+        retryWithBackoff(
+          () =>
+            updateDoc(doc(db, 'requests', id), {
+              status,
+              adminNotes,
+              processedBy: adminId,
+              processedAt: now,
+              updatedAt: now,
+            }),
+          `bulkUpdate[${id}]`
+        ).then(() => id)
+      )
+    );
+    const succeeded: string[] = [];
+    const failed: string[] = [];
+    results.forEach((r, i) => {
+      if (r.status === 'fulfilled') succeeded.push(requestIds[i]);
+      else failed.push(requestIds[i]);
+    });
+    return { succeeded, failed };
+  },
+
   getRequests: async (): Promise<Request[]> => {
     const q = query(collection(db, 'requests'), orderBy('createdAt', 'desc'));
     const snap = await getDocs(q);
