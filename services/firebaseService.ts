@@ -32,10 +32,13 @@ import {
   query,
   where,
   orderBy,
+  limit,
+  startAfter,
   onSnapshot,
   serverTimestamp,
   Unsubscribe,
   DocumentData,
+  QueryDocumentSnapshot,
 } from 'firebase/firestore';
 
 import { auth, db } from './firebase';
@@ -49,6 +52,8 @@ import {
   NotificationPrefs,
   AppNotification,
   NotificationType,
+  AuditLogEntry,
+  AuditAction,
 } from '../types';
 import { MOCK_DME, MOCK_PATIENTS } from './mockData';
 
@@ -473,6 +478,71 @@ export const firebaseService = {
    */
   markMessageRead: async (messageId: string): Promise<void> => {
     await updateDoc(doc(db, 'communications', messageId), { read: true });
+  },
+
+  // ── Audit Log ──────────────────────────────────────────────────────────────
+
+  /**
+   * Fetch a page of audit log entries (admin only — enforced by Firestore rules).
+   * Returns entries and a cursor for the next page.
+   *
+   * @param pageSize   Number of entries per page (default 50)
+   * @param after      Cursor from a previous call (for pagination)
+   * @param filterAction  Optional action type to filter on
+   */
+  getAuditLog: async (
+    pageSize = 50,
+    after?: QueryDocumentSnapshot<DocumentData>,
+    filterAction?: AuditAction
+  ): Promise<{ entries: AuditLogEntry[]; cursor: QueryDocumentSnapshot<DocumentData> | null }> => {
+    const constraints = [
+      ...(filterAction ? [where('action', '==', filterAction)] : []),
+      orderBy('timestamp', 'desc'),
+      limit(pageSize),
+      ...(after ? [startAfter(after)] : []),
+    ];
+    const q = query(collection(db, 'audit_log'), ...constraints);
+    const snap = await getDocs(q);
+    const entries = snap.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+      // Firestore serverTimestamp may come back as a Timestamp object
+      timestamp: d.data()['timestamp']?.toMillis?.() ?? d.data()['timestamp'] ?? 0,
+    } as AuditLogEntry));
+    const cursor = snap.docs.length === pageSize ? snap.docs[snap.docs.length - 1] : null;
+    return { entries, cursor };
+  },
+
+  /**
+   * Fetch aggregated request counts for the analytics dashboard.
+   * Returns counts by status and a 30-day daily submission series.
+   */
+  getAnalytics: async (): Promise<{
+    totalRequests: number;
+    byStatus: Record<string, number>;
+    recentRequests: Request[];
+    activeStaff: number;
+  }> => {
+    const [requestsSnap, staffSnap] = await Promise.all([
+      getDocs(query(collection(db, 'requests'), orderBy('createdAt', 'desc'))),
+      getDocs(query(collection(db, 'staff'), where('status', '==', 'active'))),
+    ]);
+
+    const requests = requestsSnap.docs.map((d) => toRequest(d.id, d.data()));
+    const byStatus: Record<string, number> = { pending: 0, approved: 0, denied: 0, rmi: 0 };
+    for (const r of requests) {
+      byStatus[r.status] = (byStatus[r.status] ?? 0) + 1;
+    }
+
+    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const recentRequests = requests.filter((r) => r.createdAt >= thirtyDaysAgo);
+
+    return {
+      totalRequests: requests.length,
+      byStatus,
+      recentRequests,
+      activeStaff: staffSnap.size,
+    };
   },
 
   // ── Timestamp util ─────────────────────────────────────────────────────────

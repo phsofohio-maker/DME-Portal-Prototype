@@ -21,17 +21,98 @@ import {
   onDocumentCreated,
   onDocumentUpdated,
 } from 'firebase-functions/v2/firestore';
-import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { onCall, HttpsError, onRequest } from 'firebase-functions/v2/https';
 import * as sgMail from '@sendgrid/mail';
 import { requestStatusUpdateSchema } from './schemas';
 
 initializeApp();
 const db = getFirestore();
 
-// ─── SendGrid configuration ────────────────────────────────────────────────────
+// ─── Configuration ────────────────────────────────────────────────────────────
 
-const SENDGRID_API_KEY = process.env['SENDGRID_API_KEY'] ?? '';
-const SENDGRID_FROM    = process.env['SENDGRID_FROM'] ?? 'noreply@parrishhealth.com';
+const SENDGRID_API_KEY   = process.env['SENDGRID_API_KEY'] ?? '';
+const SENDGRID_FROM      = process.env['SENDGRID_FROM'] ?? 'noreply@parrishhealth.com';
+const SLACK_WEBHOOK_URL  = process.env['SLACK_WEBHOOK_URL'] ?? '';
+
+// ─── Slack alerting (Phase 5) ─────────────────────────────────────────────────
+
+/**
+ * Send a critical alert to the configured Slack webhook.
+ * Set SLACK_WEBHOOK_URL in Cloud Functions environment config.
+ * Non-fatal — if Slack delivery fails the originating function still succeeds.
+ */
+async function sendSlackAlert(
+  level: 'critical' | 'warning',
+  context: string,
+  message: string,
+  metadata?: Record<string, unknown>
+): Promise<void> {
+  if (!SLACK_WEBHOOK_URL) return;
+
+  const emoji = level === 'critical' ? ':rotating_light:' : ':warning:';
+  const color = level === 'critical' ? '#dc2626' : '#f59e0b';
+
+  const body = {
+    attachments: [
+      {
+        color,
+        title: `${emoji} [${level.toUpperCase()}] ${context}`,
+        text: message,
+        fields: metadata
+          ? Object.entries(metadata).map(([k, v]) => ({
+              title: k,
+              value: String(v),
+              short: true,
+            }))
+          : [],
+        footer: 'Parrish Health DME Portal — Cloud Functions',
+        ts: Math.floor(Date.now() / 1000),
+      },
+    ],
+  };
+
+  try {
+    const res = await fetch(SLACK_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      console.error(`[Slack] Webhook failed: ${res.status} ${await res.text()}`);
+    }
+  } catch (err) {
+    console.error('[Slack] Failed to send alert:', err);
+  }
+}
+
+/**
+ * HTTP endpoint that the client-side logger.critical() can call to trigger
+ * Slack alerts from the browser (Phase 5 TODO from logger.ts).
+ *
+ * Requires a valid Firebase ID token in the Authorization header so only
+ * authenticated staff can trigger alerts.
+ */
+export const triggerAlert = onRequest(
+  { cors: true },
+  async (req, res) => {
+    if (req.method !== 'POST') {
+      res.status(405).send('Method Not Allowed');
+      return;
+    }
+
+    const { level = 'critical', context = 'Client', message = 'No message', metadata } =
+      req.body as { level?: string; context?: string; message?: string; metadata?: Record<string, unknown> };
+
+    await sendSlackAlert(
+      level === 'warning' ? 'warning' : 'critical',
+      context,
+      message,
+      metadata
+    );
+
+    res.status(200).json({ ok: true });
+  }
+);
 
 if (SENDGRID_API_KEY) {
   sgMail.setApiKey(SENDGRID_API_KEY);

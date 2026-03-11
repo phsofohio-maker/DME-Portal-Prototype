@@ -5,6 +5,7 @@ import { patientService } from '../../services/patientService';
 import { Staff, Patient } from '../../types';
 import { firebaseService } from '../../services/firebaseService';
 import { dmeFormSchema } from '../../lib/schemas';
+import { ICD10Field } from './ICD10Field';
 
 // ─── Inline field error helper ────────────────────────────────────────────────
 const FieldError = ({ msg }: { msg?: string }) =>
@@ -323,30 +324,23 @@ export const DMEForm: React.FC<DMEFormProps> = ({ user, onSuccess }) => {
           </div>
           
           <div className="p-6 space-y-5">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="flex flex-col gap-1.5" id="dme-icd10">
-                <label className="text-[10px] uppercase font-bold text-[#374151] tracking-wider">Primary Diagnosis (ICD-10) <span className="text-red-500">*</span></label>
-                <input
-                  type="text"
-                  placeholder="e.g. M17.11 — Osteoarthritis"
-                  className={`w-full px-4 py-2.5 border-[1.5px] rounded-xl text-sm focus:ring-2 focus:ring-[#2563eb]/10 focus:border-[#2563eb] outline-none transition-all ${errors.icd10 ? 'border-red-400' : 'border-[#e2e8f0]'}`}
-                  value={icd10}
-                  onChange={(e) => { setIcd10(e.target.value); setErrors(p => ({ ...p, icd10: '' })); }}
-                  aria-invalid={!!errors.icd10}
-                  aria-describedby={errors.icd10 ? 'err-icd10' : undefined}
-                />
-                <FieldError msg={errors.icd10} />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] uppercase font-bold text-[#374151] tracking-wider">Secondary Diagnosis</label>
-                <input 
-                  type="text" 
-                  placeholder="Additional ICD-10 codes" 
-                  className="w-full px-4 py-2.5 border-[1.5px] border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#2563eb]/10 focus:border-[#2563eb] outline-none transition-all"
-                  value={secondaryIcd10}
-                  onChange={(e) => setSecondaryIcd10(e.target.value)}
-                />
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4" id="dme-icd10">
+              <ICD10Field
+                id="dme-icd10-primary"
+                label="Primary Diagnosis (ICD-10)"
+                value={icd10}
+                onChange={(code) => { setIcd10(code); setErrors(p => ({ ...p, icd10: '' })); }}
+                required
+                error={errors.icd10}
+                placeholder="Search by code or description (e.g. M17.1)"
+              />
+              <ICD10Field
+                id="dme-icd10-secondary"
+                label="Secondary Diagnosis (ICD-10)"
+                value={secondaryIcd10}
+                onChange={setSecondaryIcd10}
+                placeholder="Optional additional diagnosis"
+              />
             </div>
 
             <div className="flex flex-col gap-1.5" id="dme-justification">
