@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "seed": "node scripts/seed.mjs"
   },
   "dependencies": {
     "firebase": "^12.9.0",
@@ -27,9 +27,9 @@
     "eslint": "^9.0.0",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",
+    "firebase-admin": "^13.7.0",
     "globals": "^17.3.0",
     "postcss": "^8.5.6",
-    "prettier": "^3.8.1",
     "tailwindcss": "^4.2.1",
     "typescript": "~5.8.2",
     "typescript-eslint": "^8.0.0",
