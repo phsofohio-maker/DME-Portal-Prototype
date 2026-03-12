@@ -13,7 +13,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ user, onUpdate }) => {
   const [mfaEnrolled, setMfaEnrolled] = useState<boolean | null>(null);
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [prefs, setPrefs] = useState<NotificationPrefs>(
-    user.notificationPrefs ?? { emailOnStatusChange: true, emailOnNewMessage: true }
+    user.notificationPrefs ?? { emailOnStatusChange: true, emailOnNewMessage: true, inAppOnStatusChange: true, inAppOnNewMessage: true }
   );
 
   // Check MFA enrollment status for admin users
@@ -114,8 +114,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ user, onUpdate }) => {
             </svg>
           </div>
           <div>
-            <h3 className="font-bold text-slate-900 serif">Email Notifications</h3>
-            <p className="text-xs text-slate-500">Manage when you receive external alerts.</p>
+            <h3 className="font-bold text-slate-900 serif">Notification Preferences</h3>
+            <p className="text-xs text-slate-500">Control how and when you receive alerts.</p>
           </div>
           {savingPrefs && (
             <div className="ml-auto text-[10px] text-blue-500 font-bold animate-pulse" role="status" aria-live="polite">
@@ -124,17 +124,59 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ user, onUpdate }) => {
           )}
         </div>
 
-        <div className="space-y-4" role="group" aria-label="Notification preferences">
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Email Alerts</p>
+        <div className="space-y-3 mb-6" role="group" aria-label="Email notification preferences">
           {[
             {
               key: 'emailOnStatusChange' as const,
-              label: 'Request Updates',
-              desc: 'Notify me when an admin approves or denies a request.',
+              label: 'Request Status Updates',
+              desc: 'Email me when an admin approves or denies a request.',
             },
             {
               key: 'emailOnNewMessage' as const,
-              label: 'Direct Messages',
-              desc: 'Notify me when a colleague sends a new secure message.',
+              label: 'New Messages',
+              desc: 'Email me when a colleague sends a new secure message.',
+            },
+          ].map(({ key, label, desc }) => (
+            <div
+              key={key}
+              className="flex items-center justify-between p-4 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors"
+            >
+              <div>
+                <p className="text-sm font-bold text-slate-800">{label}</p>
+                <p className="text-[11px] text-slate-500">{desc}</p>
+              </div>
+              <button
+                onClick={() => updatePrefs({ [key]: !prefs[key] })}
+                role="switch"
+                aria-checked={prefs[key]}
+                aria-label={label}
+                className={`w-12 h-6 rounded-full p-1 transition-colors duration-200 ease-in-out flex items-center ${
+                  prefs[key] ? 'bg-green-500' : 'bg-slate-200'
+                }`}
+              >
+                <div
+                  className={`w-4 h-4 bg-white rounded-full shadow-sm transform transition-transform duration-200 ${
+                    prefs[key] ? 'translate-x-6' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">In-App Notifications</p>
+        <div className="space-y-3" role="group" aria-label="In-app notification preferences">
+          {[
+            {
+              key: 'inAppOnStatusChange' as const,
+              label: 'Request Updates',
+              desc: 'Show in-app notifications when a request status changes.',
+            },
+            {
+              key: 'inAppOnNewMessage' as const,
+              label: 'New Messages',
+              desc: 'Show in-app notifications for incoming secure messages.',
             },
           ].map(({ key, label, desc }) => (
             <div

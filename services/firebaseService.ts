@@ -208,7 +208,7 @@ export const firebaseService = {
       status: 'active',
       createdAt: now,
       updatedAt: now,
-      notificationPrefs: { emailOnStatusChange: true, emailOnNewMessage: true },
+      notificationPrefs: { emailOnStatusChange: true, emailOnNewMessage: true, inAppOnStatusChange: true, inAppOnNewMessage: true },
     } satisfies Omit<Staff, 'uid'>);
 
     // Store the invitation record

@@ -382,7 +382,7 @@ export const onRequestUpdated = onDocumentUpdated(
       // Non-fatal — do not throw
     }
 
-    // Create in-app notification + FCM push for the submitter
+    // Create in-app notification + FCM push for the submitter (if prefs allow)
     const submitterId = after.submitterId as string | undefined;
     if (submitterId) {
       const statusLabels: Record<string, string> = {
@@ -393,10 +393,16 @@ export const onRequestUpdated = onDocumentUpdated(
       const label = statusLabels[after.status as string] ?? String(after.status);
       const notifTitle = `Request ${label}`;
       const notifBody  = `Your request for ${(after.patientName as string) ?? 'a patient'} has been ${label.toLowerCase()}.`;
-      await Promise.all([
-        createNotification(submitterId, 'request.status_change', notifTitle, notifBody, event.params.requestId),
-        sendPushNotification(submitterId, notifTitle, notifBody),
-      ]);
+
+      // Check submitter's in-app notification preference (default: on)
+      const submitterSnap = await db.doc(`staff/${submitterId}`).get();
+      const submitterPrefs = submitterSnap.data()?.notificationPrefs;
+      if (submitterPrefs?.inAppOnStatusChange !== false) {
+        await Promise.all([
+          createNotification(submitterId, 'request.status_change', notifTitle, notifBody, event.params.requestId),
+          sendPushNotification(submitterId, notifTitle, notifBody),
+        ]);
+      }
     }
   }
 );
@@ -482,10 +488,16 @@ export const onMessageCreated = onDocumentCreated(
     if (recipientId && senderName) {
       const pushTitle = `New message from ${senderName}`;
       const pushBody  = 'You have a new secure message. Click to view.';
-      await Promise.all([
-        createNotification(recipientId, 'message.received', pushTitle, pushBody, event.params.msgId),
-        sendPushNotification(recipientId, pushTitle, pushBody),
-      ]);
+
+      // Check recipient's in-app notification preference (default: on)
+      const recipientPrefSnap = await db.doc(`staff/${recipientId}`).get();
+      const recipientPrefs = recipientPrefSnap.data()?.notificationPrefs;
+      if (recipientPrefs?.inAppOnNewMessage !== false) {
+        await Promise.all([
+          createNotification(recipientId, 'message.received', pushTitle, pushBody, event.params.msgId),
+          sendPushNotification(recipientId, pushTitle, pushBody),
+        ]);
+      }
 
       // Email the recipient if they have emailOnNewMessage enabled
       try {

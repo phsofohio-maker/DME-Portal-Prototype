@@ -6,6 +6,8 @@ export type RequestStatus = 'pending' | 'approved' | 'denied' | 'rmi';
 export interface NotificationPrefs {
   emailOnStatusChange: boolean;
   emailOnNewMessage: boolean;
+  inAppOnStatusChange: boolean;
+  inAppOnNewMessage: boolean;
 }
 
 export interface Staff {
