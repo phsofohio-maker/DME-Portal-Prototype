@@ -181,3 +181,18 @@ export const adminActionSchema = z.object({
 });
 
 export type AdminActionValues = z.infer<typeof adminActionSchema>;
+
+// ─── Bulk admin action schema ─────────────────────────────────────────────────
+
+export const bulkAdminActionSchema = z.object({
+  requestIds: z
+    .array(nonEmptyString)
+    .min(1, { message: 'Select at least one request.' }),
+  status: z.enum(['approved', 'denied']),
+  adminNotes: z
+    .string()
+    .trim()
+    .min(5, { message: 'Please provide a reason (at least 5 characters).' }),
+});
+
+export type BulkAdminActionValues = z.infer<typeof bulkAdminActionSchema>;

@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Staff } from '../../types';
 import { NotificationBell } from '../Notifications/NotificationBell';
 import { OfflineBanner } from './OfflineBanner';
+import { firebaseService } from '../../services/firebaseService';
 
 interface LayoutProps {
   user: Staff;
@@ -134,6 +135,17 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, children }) => {
       events.forEach((e) => window.removeEventListener(e, resetTimer));
     };
   }, [resetTimer]);
+
+  // ── FCM push permission (Phase 3.3) ─────────────────────────────────────────
+  // Ask once after the user logs in. The browser will only show the native
+  // permission prompt if they haven't been asked before; subsequent calls
+  // are silent if already granted or denied.
+  useEffect(() => {
+    firebaseService.requestPushPermission(user.uid).catch(() => {
+      // Non-fatal — app works without push; swallow to avoid noise in console.
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user.uid]);
 
   const menuItems = [
     { label: 'Dashboard', path: '/', icon: <Icons.Dashboard /> },

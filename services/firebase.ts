@@ -13,15 +13,15 @@ import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 import { getFunctions } from 'firebase/functions';
+import { getMessaging, isSupported as messagingIsSupported } from 'firebase/messaging';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBEMZoWCqesSpCvB29p9MAAc7KSX_DJq5w",
-  authDomain: "parrish-dme-portal.firebaseapp.com",
-  projectId: "parrish-dme-portal",
-  storageBucket: "parrish-dme-portal.firebasestorage.app",
-  messagingSenderId: "1017187886488",
-  appId: "1:1017187886488:web:63304918011c4b9ad937ed",
-  measurementId: "G-FW91NSP8S8"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
 const app = initializeApp(firebaseConfig);
@@ -34,3 +34,11 @@ export const db = initializeFirestore(app, {
 });
 
 export const functions = getFunctions(app);
+
+/**
+ * FCM messaging instance — only available in browsers that support it
+ * (requires HTTPS + service workers). Resolves to null in unsupported envs.
+ */
+export const messaging = messagingIsSupported().then((ok) =>
+  ok ? getMessaging(app) : null
+);

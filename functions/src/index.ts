@@ -17,11 +17,13 @@
 
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { getMessaging } from 'firebase-admin/messaging';
 import {
   onDocumentCreated,
   onDocumentUpdated,
 } from 'firebase-functions/v2/firestore';
 import { onCall, HttpsError, onRequest } from 'firebase-functions/v2/https';
+import { onSchedule } from 'firebase-functions/v2/scheduler';
 import * as sgMail from '@sendgrid/mail';
 import { requestStatusUpdateSchema } from './schemas';
 
@@ -82,6 +84,36 @@ async function sendSlackAlert(
     }
   } catch (err) {
     console.error('[Slack] Failed to send alert:', err);
+  }
+}
+
+// ─── FCM push helper (Phase 3.3) ─────────────────────────────────────────────
+
+/**
+ * Send a Firebase Cloud Messaging push notification to a specific device token.
+ * Looks up the recipient's fcmToken from their staff document.
+ * Non-fatal — if push fails (expired token, permission revoked) the
+ * originating function still succeeds.
+ */
+async function sendPushNotification(
+  recipientId: string,
+  title: string,
+  body: string
+): Promise<void> {
+  try {
+    const staffSnap = await db.doc(`staff/${recipientId}`).get();
+    const token = staffSnap.data()?.fcmToken as string | undefined;
+    if (!token) return; // user hasn't enabled push or token not yet saved
+
+    await getMessaging().send({
+      token,
+      notification: { title, body },
+      android: { notification: { icon: 'notification_icon', color: '#2563eb' } },
+      apns: { payload: { aps: { badge: 1 } } },
+    });
+  } catch (err) {
+    // Token may be stale (e.g. user cleared browser data) — log but don't throw
+    console.warn(`[FCM] Push to ${recipientId} failed:`, err);
   }
 }
 
@@ -154,6 +186,63 @@ async function createNotification(
   }
 }
 
+// ─── Helper: notify admins of a new submission ────────────────────────────────
+
+/**
+ * Fetches all active admin staff documents and sends a new-submission email to
+ * each admin whose notificationPrefs.emailOnStatusChange is true.
+ *
+ * HIPAA note: email contains only patient name and submitter name (no clinical
+ * details). Admins must log in to the portal to view full request content.
+ */
+async function notifyAdminsOfNewRequest(
+  requestId: string,
+  submitterName: string,
+  patientName: string,
+  requestType: string
+): Promise<void> {
+  if (!SENDGRID_API_KEY) {
+    console.log(`[SendGrid SKIPPED — no API key] New request ${requestId} by ${submitterName}`);
+    return;
+  }
+
+  try {
+    const adminsSnap = await db
+      .collection('staff')
+      .where('role', '==', 'admin')
+      .where('status', '==', 'active')
+      .get();
+
+    const sends = adminsSnap.docs
+      .filter((doc) => doc.data()?.notificationPrefs?.emailOnStatusChange === true)
+      .map((doc) => {
+        const admin = doc.data();
+        return sgMail.send({
+          to: admin.email as string,
+          from: SENDGRID_FROM,
+          subject: '[Parrish Portal] New Request Submitted',
+          text: [
+            `Hello ${admin.displayName as string},`,
+            '',
+            `A new ${requestType.toUpperCase()} request has been submitted.`,
+            '',
+            `Patient: ${patientName}`,
+            `Submitted by: ${submitterName}`,
+            '',
+            'Please log in to the Admin Inbox to review and process this request.',
+            '',
+            '— Parrish Health Staff Portal',
+          ].join('\n'),
+        });
+      });
+
+    await Promise.allSettled(sends);
+  } catch (err) {
+    console.error('[SendGrid] Failed to notify admins of new request:', err);
+    // Non-fatal
+  }
+}
+
 // ─── Helper: send status-change email via SendGrid ────────────────────────────
 
 async function sendStatusEmail(
@@ -212,6 +301,7 @@ export const onRequestCreated = onDocumentCreated(
     const actorId = data.submitterId as string;
     const actorRole = await getActorRole(actorId);
 
+    // Write audit log
     await db.collection('audit_log').add({
       timestamp:    FieldValue.serverTimestamp(),
       actorId,
@@ -221,6 +311,14 @@ export const onRequestCreated = onDocumentCreated(
       resourceId:   event.params.requestId,
       after:        data,
     });
+
+    // Notify admins of new submission
+    await notifyAdminsOfNewRequest(
+      event.params.requestId,
+      (data.submitterName as string) ?? 'Unknown',
+      (data.patientName   as string) ?? 'Unknown',
+      (data.type          as string) ?? 'unknown'
+    );
   }
 );
 
@@ -284,7 +382,7 @@ export const onRequestUpdated = onDocumentUpdated(
       // Non-fatal — do not throw
     }
 
-    // Create in-app notification for the submitter
+    // Create in-app notification + FCM push for the submitter
     const submitterId = after.submitterId as string | undefined;
     if (submitterId) {
       const statusLabels: Record<string, string> = {
@@ -293,13 +391,12 @@ export const onRequestUpdated = onDocumentUpdated(
         rmi:      'More Info Needed',
       };
       const label = statusLabels[after.status as string] ?? String(after.status);
-      await createNotification(
-        submitterId,
-        'request.status_change',
-        `Request ${label}`,
-        `Your request for ${(after.patientName as string) ?? 'a patient'} has been ${label.toLowerCase()}.`,
-        event.params.requestId
-      );
+      const notifTitle = `Request ${label}`;
+      const notifBody  = `Your request for ${(after.patientName as string) ?? 'a patient'} has been ${label.toLowerCase()}.`;
+      await Promise.all([
+        createNotification(submitterId, 'request.status_change', notifTitle, notifBody, event.params.requestId),
+        sendPushNotification(submitterId, notifTitle, notifBody),
+      ]);
     }
   }
 );
@@ -379,17 +476,44 @@ export const onMessageCreated = onDocumentCreated(
       },
     });
 
-    // Create in-app notification for the recipient
+    // Create in-app notification and send email to the recipient
     const recipientId = data.recipientId as string | undefined;
     const senderName  = data.senderName  as string | undefined;
     if (recipientId && senderName) {
-      await createNotification(
-        recipientId,
-        'message.received',
-        `New message from ${senderName}`,
-        'You have a new secure message. Click to view.',
-        event.params.msgId
-      );
+      const pushTitle = `New message from ${senderName}`;
+      const pushBody  = 'You have a new secure message. Click to view.';
+      await Promise.all([
+        createNotification(recipientId, 'message.received', pushTitle, pushBody, event.params.msgId),
+        sendPushNotification(recipientId, pushTitle, pushBody),
+      ]);
+
+      // Email the recipient if they have emailOnNewMessage enabled
+      try {
+        if (SENDGRID_API_KEY) {
+          const recipientSnap = await db.doc(`staff/${recipientId}`).get();
+          const recipient = recipientSnap.data();
+          if (recipient?.notificationPrefs?.emailOnNewMessage && recipient?.email) {
+            await sgMail.send({
+              to: recipient.email as string,
+              from: SENDGRID_FROM,
+              subject: `[Parrish Portal] New secure message from ${senderName}`,
+              text: [
+                `Hello ${recipient.displayName as string},`,
+                '',
+                `You have a new secure message from ${senderName}.`,
+                '',
+                'HIPAA reminder: do not reply to this email. Log in to the portal to read and',
+                'respond through the secure HIPAA-compliant messaging channel.',
+                '',
+                '— Parrish Health Staff Portal',
+              ].join('\n'),
+            });
+          }
+        }
+      } catch (emailErr) {
+        console.error('[SendGrid] Failed to send message notification email:', emailErr);
+        // Non-fatal
+      }
     }
   }
 );
@@ -446,4 +570,102 @@ export const seedCatalog = onCall(async (request) => {
   }
 
   return { message: 'Seed callable ready. Import from migration script.' };
+});
+
+// ─── Auth event audit logging (Phase 4 §7.1 — HIPAA 164.312(b)) ──────────────
+
+/**
+ * Callable function that writes auth.login / auth.logout events to the
+ * immutable audit_log collection.
+ *
+ * Why callable instead of a Firestore trigger: Firebase Auth events are not
+ * Firestore document changes, so they cannot use onDocumentCreated/Updated.
+ * The audit_log security rules block all client writes, so the client calls
+ * this function which writes via the Admin SDK (bypasses rules).
+ *
+ * The function trusts request.auth (verified by Firebase ID token) — no
+ * additional authorization check is needed since any authenticated active
+ * staff member may log their own session events.
+ */
+export const logAuthEvent = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Authentication required.');
+  }
+
+  const action = request.data?.action as string | undefined;
+  if (action !== 'auth.login' && action !== 'auth.logout') {
+    throw new HttpsError('invalid-argument', 'action must be auth.login or auth.logout');
+  }
+
+  const uid      = request.auth.uid;
+  const roleSnap = await db.doc(`staff/${uid}`).get();
+  const role     = (roleSnap.data()?.role as string) ?? 'unknown';
+
+  await db.collection('audit_log').add({
+    timestamp:    FieldValue.serverTimestamp(),
+    actorId:      uid,
+    actorRole:    role,
+    action,
+    resourceType: 'auth',
+    resourceId:   uid,
+  });
+
+  return { logged: true };
+});
+
+// ─── Scheduled data retention (Phase 4 §7.3 — HIPAA record retention) ────────
+
+/**
+ * Runs on the 1st of each month. Marks requests older than 7 years as
+ * `archived: true` (soft-archive — records are never hard-deleted).
+ *
+ * HIPAA requires 6 years for compliance documentation; many states require
+ * 7–10 years for medical records. Parrish Health uses 7 years by default.
+ * Update RETENTION_YEARS to match your state's requirements.
+ *
+ * Archived requests are excluded from the active Admin Inbox but remain
+ * queryable for audit and legal purposes.
+ */
+const RETENTION_YEARS = 7;
+
+export const scheduledDataRetention = onSchedule('0 2 1 * *', async () => {
+  const cutoff = Date.now() - RETENTION_YEARS * 365.25 * 24 * 60 * 60 * 1000;
+
+  const staleSnap = await db
+    .collection('requests')
+    .where('createdAt', '<', cutoff)
+    .where('archived', '==', false)
+    .limit(500) // process in batches to stay within function timeout
+    .get();
+
+  if (staleSnap.empty) {
+    console.log('[Retention] No requests require archiving.');
+    return;
+  }
+
+  const batch = db.batch();
+  staleSnap.docs.forEach((docSnap) => {
+    batch.update(docSnap.ref, {
+      archived:   true,
+      archivedAt: FieldValue.serverTimestamp(),
+    });
+  });
+  await batch.commit();
+
+  // Audit log entry for the archival run
+  await db.collection('audit_log').add({
+    timestamp:    FieldValue.serverTimestamp(),
+    actorId:      'system',
+    actorRole:    'admin',
+    action:       'request.update',
+    resourceType: 'request',
+    resourceId:   'batch_archive',
+    after: {
+      archivedCount: staleSnap.size,
+      retentionYears: RETENTION_YEARS,
+      cutoffTimestamp: cutoff,
+    },
+  });
+
+  console.log(`[Retention] Archived ${staleSnap.size} requests older than ${RETENTION_YEARS} years.`);
 });

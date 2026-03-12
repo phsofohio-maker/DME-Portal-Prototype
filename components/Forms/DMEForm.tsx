@@ -377,8 +377,8 @@ export const DMEForm: React.FC<DMEFormProps> = ({ user, onSuccess }) => {
             </div>
 
             <div className="flex flex-col gap-2">
-              <label className="text-[10px] uppercase font-bold text-[#374151] tracking-wider">Urgency Level <span className="text-red-500">*</span></label>
-              <div className="grid grid-cols-3 gap-3">
+              <span id="dme-urgency-label" className="text-[10px] uppercase font-bold text-[#374151] tracking-wider">Urgency Level <span className="text-red-500" aria-hidden="true">*</span></span>
+              <div role="group" aria-labelledby="dme-urgency-label" className="grid grid-cols-3 gap-3">
                 {[
                   { label: 'Routine', color: 'teal', desc: '5–7 days' },
                   { label: 'Urgent', color: 'amber', desc: '48 hrs' },
@@ -387,15 +387,16 @@ export const DMEForm: React.FC<DMEFormProps> = ({ user, onSuccess }) => {
                   <button
                     key={u.label}
                     type="button"
+                    aria-pressed={urgency === u.label}
                     onClick={() => setUrgency(u.label)}
                     className={`p-3 border-[1.5px] rounded-2xl text-left transition-all group ${
-                      urgency === u.label 
+                      urgency === u.label
                       ? u.color === 'teal' ? 'bg-[#f0fdfa] border-[#0d9488]' : u.color === 'amber' ? 'bg-[#fffbeb] border-[#d97706]' : 'bg-[#fff5f5] border-[#dc2626]'
                       : 'border-[#e2e8f0] hover:shadow-md'
                     }`}
                   >
                     <div className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${
-                      urgency === u.label 
+                      urgency === u.label
                       ? u.color === 'teal' ? 'text-[#0d9488]' : u.color === 'amber' ? 'text-[#d97706]' : 'text-[#dc2626]'
                       : 'text-slate-400'
                     }`}>{u.label}</div>
@@ -418,7 +419,7 @@ export const DMEForm: React.FC<DMEFormProps> = ({ user, onSuccess }) => {
           </div>
           
           <div className="p-6 space-y-4">
-            <div className="space-y-2">
+            <div role="group" aria-label="Authorization consents" className="space-y-2">
               {[
                 "I certify the clinical information provided is accurate and complete to the best of my knowledge.",
                 "I authorize release of medical records necessary to process this DME request and insurance claim.",
@@ -427,10 +428,12 @@ export const DMEForm: React.FC<DMEFormProps> = ({ user, onSuccess }) => {
                 <button
                   key={i}
                   type="button"
+                  role="checkbox"
+                  aria-checked={consents[i]}
                   onClick={() => toggleConsent(i)}
                   className={`w-full flex items-start gap-4 p-3 rounded-xl border-[1.5px] text-left text-[0.82rem] transition-all group ${consents[i] ? 'bg-[#f0fdfa] border-[#0d9488] text-[#162d4e]' : 'border-[#e2e8f0] text-slate-500 hover:border-[#2563eb] hover:text-[#0f172a]'}`}
                 >
-                  <div className={`w-4.5 h-4.5 rounded flex-shrink-0 flex items-center justify-center mt-0.5 border-2 transition-all ${consents[i] ? 'bg-[#0d9488] border-[#0d9488]' : 'bg-white border-[#e2e8f0] group-hover:border-[#2563eb]'}`}>
+                  <div aria-hidden="true" className={`w-4.5 h-4.5 rounded flex-shrink-0 flex items-center justify-center mt-0.5 border-2 transition-all ${consents[i] ? 'bg-[#0d9488] border-[#0d9488]' : 'bg-white border-[#e2e8f0] group-hover:border-[#2563eb]'}`}>
                     {consents[i] && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4"><polyline points="20 6 9 17 4 12"/></svg>}
                   </div>
                   <span>{text}</span>

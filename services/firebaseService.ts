@@ -41,7 +41,16 @@ import {
   QueryDocumentSnapshot,
 } from 'firebase/firestore';
 
-import { auth, db } from './firebase';
+import { auth, db, functions } from './firebase';
+import { messaging as messagingPromise } from './firebase';
+import { getToken } from 'firebase/messaging';
+import { httpsCallable } from 'firebase/functions';
+import { retryWithBackoff } from '../utils/retryWithBackoff';
+import {
+  generateConversationKey,
+  encryptMessage,
+  decryptMessage,
+} from './cryptoService';
 import {
   Staff,
   Request,
@@ -68,6 +77,39 @@ const toRequest = (id: string, data: DocumentData): Request =>
 const toComm = (id: string, data: DocumentData): Communication =>
   ({ id, ...data } as Communication);
 
+// ─── Conversation key management (Phase 3 §3.4) ───────────────────────────────
+
+function getConversationId(uid1: string, uid2: string): string {
+  return [uid1, uid2].sort().join('_');
+}
+
+/**
+ * Returns the AES-GCM-256 key for a conversation, creating it on first use.
+ * Key is stored in `conversationKeys/{conversationId}` and access-controlled
+ * by Firestore Security Rules to the two participants only.
+ */
+async function getOrCreateConversationKey(uid1: string, uid2: string): Promise<string> {
+  const convId = getConversationId(uid1, uid2);
+  const keyRef = doc(db, 'conversationKeys', convId);
+  const snap = await getDoc(keyRef);
+  if (snap.exists()) return snap.data().key as string;
+
+  const key = await generateConversationKey();
+  await setDoc(keyRef, { participants: [uid1, uid2].sort(), key });
+  return key;
+}
+
+/** Decrypt a single message; pass through unchanged if it has no IV (legacy plaintext). */
+async function decryptComm(key: string, msg: Communication): Promise<Communication> {
+  if (!msg.iv) return msg;
+  try {
+    const plaintext = await decryptMessage(key, msg.iv, msg.messageBody);
+    return { ...msg, messageBody: plaintext };
+  } catch {
+    return { ...msg, messageBody: '[Unable to decrypt message]' };
+  }
+}
+
 const toInvite = (id: string, data: DocumentData): UserInvitation =>
   ({ id, ...data } as UserInvitation);
 
@@ -78,13 +120,21 @@ export const firebaseService = {
 
   /**
    * Sign in with email + password via Firebase Auth.
-   * The onAuthStateChanged listener in App.tsx handles loading the staff profile.
+   * Writes an auth.login audit entry via Cloud Function after successful auth.
    */
   login: async (email: string, password: string): Promise<void> => {
     await signInWithEmailAndPassword(auth, email, password);
+    // Fire-and-forget audit log — non-fatal if CF is unavailable during dev
+    httpsCallable(functions, 'logAuthEvent')({ action: 'auth.login' }).catch(() => {});
   },
 
   logout: async (): Promise<void> => {
+    // Log before signing out while the ID token is still valid
+    try {
+      await httpsCallable(functions, 'logAuthEvent')({ action: 'auth.logout' });
+    } catch {
+      // Non-fatal — still sign out even if audit log fails
+    }
     await signOut(auth);
   },
 
@@ -106,10 +156,10 @@ export const firebaseService = {
   },
 
   updateStaff: async (uid: string, updates: Partial<Staff>): Promise<void> => {
-    await updateDoc(doc(db, 'staff', uid), {
-      ...updates,
-      updatedAt: Date.now(),
-    });
+    await retryWithBackoff(
+      () => updateDoc(doc(db, 'staff', uid), { ...updates, updatedAt: Date.now() }),
+      'updateStaff'
+    );
   },
 
   /**
@@ -187,13 +237,78 @@ export const firebaseService = {
     request: Omit<Request, 'id' | 'createdAt' | 'updatedAt' | 'status'>
   ): Promise<string> => {
     const now = Date.now();
-    const ref = await addDoc(collection(db, 'requests'), {
-      ...request,
-      status: 'pending',
-      createdAt: now,
-      updatedAt: now,
-    });
+    const ref = await retryWithBackoff(
+      () => addDoc(collection(db, 'requests'), {
+        ...request,
+        status: 'pending',
+        createdAt: now,
+        updatedAt: now,
+      }),
+      'submitRequest'
+    );
     return ref.id;
+  },
+
+  /**
+   * Escalate a request: assign to a specific admin and/or flag for supervisor review.
+   * Escalation is additive — it does not change the request status.
+   */
+  escalateRequest: async (
+    requestId: string,
+    escalatedTo?: string,
+    escalatedToName?: string,
+    flaggedForSupervisor?: boolean,
+    escalationNote?: string
+  ): Promise<void> => {
+    const update: Record<string, unknown> = {
+      escalatedAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    if (escalatedTo) {
+      update['escalatedTo'] = escalatedTo;
+      update['escalatedToName'] = escalatedToName ?? '';
+    }
+    if (flaggedForSupervisor !== undefined) update['flaggedForSupervisor'] = flaggedForSupervisor;
+    if (escalationNote) update['escalationNote'] = escalationNote;
+    await retryWithBackoff(
+      () => updateDoc(doc(db, 'requests', requestId), update),
+      'escalateRequest'
+    );
+  },
+
+  /**
+   * Bulk approve or deny multiple requests in parallel.
+   * All updates use retryWithBackoff — partial failures are surfaced via Promise.allSettled.
+   */
+  bulkUpdateRequestStatus: async (
+    requestIds: string[],
+    status: 'approved' | 'denied',
+    adminNotes: string,
+    adminId: string
+  ): Promise<{ succeeded: string[]; failed: string[] }> => {
+    const now = Date.now();
+    const results = await Promise.allSettled(
+      requestIds.map((id) =>
+        retryWithBackoff(
+          () =>
+            updateDoc(doc(db, 'requests', id), {
+              status,
+              adminNotes,
+              processedBy: adminId,
+              processedAt: now,
+              updatedAt: now,
+            }),
+          `bulkUpdate[${id}]`
+        ).then(() => id)
+      )
+    );
+    const succeeded: string[] = [];
+    const failed: string[] = [];
+    results.forEach((r, i) => {
+      if (r.status === 'fulfilled') succeeded.push(requestIds[i]);
+      else failed.push(requestIds[i]);
+    });
+    return { succeeded, failed };
   },
 
   getRequests: async (): Promise<Request[]> => {
@@ -217,7 +332,10 @@ export const firebaseService = {
       updatedAt: Date.now(),
     };
     if (rmiNotes !== undefined) update['rmiNotes'] = rmiNotes;
-    await updateDoc(doc(db, 'requests', requestId), update);
+    await retryWithBackoff(
+      () => updateDoc(doc(db, 'requests', requestId), update),
+      'updateRequestStatus'
+    );
   },
 
   /**
@@ -290,13 +408,19 @@ export const firebaseService = {
     uid2: string,
     callback: (messages: Communication[]) => void
   ): Unsubscribe => {
-    // Track latest snapshot from each direction, merge and re-emit on any change.
-    let sentDocs: Communication[] = [];
-    let receivedDocs: Communication[] = [];
+    // Track latest encrypted snapshot from each direction.
+    let sentEncrypted: Communication[] = [];
+    let receivedEncrypted: Communication[] = [];
 
-    const emit = () => {
-      const merged = [...sentDocs, ...receivedDocs].sort((a, b) => a.createdAt - b.createdAt);
-      callback(merged);
+    // Fetch (or create) the conversation key once — reused for every decrypt.
+    const keyPromise = getOrCreateConversationKey(uid1, uid2);
+
+    const emitDecrypted = () => {
+      const all = [...sentEncrypted, ...receivedEncrypted];
+      keyPromise.then(async (key) => {
+        const decrypted = await Promise.all(all.map((m) => decryptComm(key, m)));
+        callback(decrypted.sort((a, b) => a.createdAt - b.createdAt));
+      });
     };
 
     const unsubSent = onSnapshot(
@@ -307,8 +431,8 @@ export const firebaseService = {
         orderBy('createdAt', 'asc')
       ),
       (snap) => {
-        sentDocs = snap.docs.map((d) => toComm(d.id, d.data()));
-        emit();
+        sentEncrypted = snap.docs.map((d) => toComm(d.id, d.data()));
+        emitDecrypted();
       }
     );
 
@@ -320,8 +444,8 @@ export const firebaseService = {
         orderBy('createdAt', 'asc')
       ),
       (snap) => {
-        receivedDocs = snap.docs.map((d) => toComm(d.id, d.data()));
-        emit();
+        receivedEncrypted = snap.docs.map((d) => toComm(d.id, d.data()));
+        emitDecrypted();
       }
     );
 
@@ -334,44 +458,24 @@ export const firebaseService = {
   sendMessage: async (
     message: Omit<Communication, 'id' | 'createdAt' | 'read'>
   ): Promise<void> => {
-    await addDoc(collection(db, 'communications'), {
-      ...message,
-      read: false,
-      createdAt: Date.now(),
-    });
-  },
-
-  // ── Notifications (simulated — Phase 2 will wire SendGrid) ────────────────
-
-  simulateEmail: (to: string, subject: string, body: string) => {
-    console.log(
-      `%c[EMAIL SERVICE] To: ${to}\nSubject: ${subject}\nBody: ${body}`,
-      'color: #2563eb; font-weight: bold;'
+    const key = await getOrCreateConversationKey(message.senderId, message.recipientId);
+    const { iv, ciphertext } = await encryptMessage(key, message.messageBody);
+    await retryWithBackoff(
+      () => addDoc(collection(db, 'communications'), {
+        ...message,
+        messageBody: ciphertext,
+        iv,
+        read: false,
+        createdAt: Date.now(),
+      }),
+      'sendMessage'
     );
   },
 
-  notifyUser: async (userId: string, type: 'status' | 'message', data: Record<string, unknown>): Promise<void> => {
-    const recipient = await firebaseService.getStaffProfile(userId);
-    if (!recipient?.notificationPrefs) return;
-
-    if (type === 'status' && recipient.notificationPrefs.emailOnStatusChange) {
-      firebaseService.simulateEmail(
-        recipient.email,
-        `Request Update — Parrish Portal`,
-        `Hello ${recipient.displayName},\n\nYour request for patient ${data['patientName']} has been ${String(data['status']).toUpperCase()}.\n\nAdmin notes: ${data['adminNotes'] ?? 'None'}\n\nLog in to the portal for details.`
-      );
-    }
-
-    if (type === 'message' && recipient.notificationPrefs.emailOnNewMessage) {
-      firebaseService.simulateEmail(
-        recipient.email,
-        `New Message — Parrish Portal`,
-        `Hello ${recipient.displayName},\n\nYou have a new message from ${data['senderName']}.\n\nLog in to reply.`
-      );
-    }
-  },
-
   // ── Catalog & Patient Seeding (run once by an admin) ─────────────────────
+  // Note: email notifications are handled server-side by Cloud Functions
+  // (onRequestUpdated, onRequestCreated, onMessageCreated in functions/src/index.ts).
+  // The client does not need to send emails directly.
 
   /**
    * Seeds the dme_catalog and patients Firestore collections from mock data.
@@ -400,10 +504,59 @@ export const firebaseService = {
   },
 
   updateNotificationPrefs: async (uid: string, prefs: NotificationPrefs): Promise<void> => {
-    await updateDoc(doc(db, 'staff', uid), {
-      notificationPrefs: prefs,
-      updatedAt: Date.now(),
-    });
+    await retryWithBackoff(
+      () => updateDoc(doc(db, 'staff', uid), { notificationPrefs: prefs, updatedAt: Date.now() }),
+      'updateNotificationPrefs'
+    );
+  },
+
+  /**
+   * Request browser push notification permission and register the FCM service
+   * worker. On success, the device token is saved to the staff Firestore
+   * document so Cloud Functions can deliver targeted push messages.
+   *
+   * Safe to call multiple times — exits early if permission is already granted
+   * and a token is already stored.  Returns false if unsupported or denied.
+   */
+  requestPushPermission: async (uid: string): Promise<boolean> => {
+    if (!('serviceWorker' in navigator) || !('Notification' in window)) return false;
+
+    const messaging = await messagingPromise;
+    if (!messaging) return false;
+
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') return false;
+
+    try {
+      // Register the service worker and give it the Firebase config
+      // (config values are non-secret — they identify the project, not auth keys)
+      const swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+
+      const config = {
+        apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
+        authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+        projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID,
+        storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+        messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+        appId:             import.meta.env.VITE_FIREBASE_APP_ID,
+      };
+      swReg.active?.postMessage({ type: 'FIREBASE_CONFIG', config });
+
+      const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY as string | undefined;
+      const token = await getToken(messaging, {
+        vapidKey,
+        serviceWorkerRegistration: swReg,
+      });
+
+      if (token) {
+        await updateDoc(doc(db, 'staff', uid), { fcmToken: token, updatedAt: Date.now() });
+      }
+
+      return !!token;
+    } catch (err) {
+      console.warn('[FCM] Failed to register push notifications:', err);
+      return false;
+    }
   },
 
   // ── In-App Notifications ───────────────────────────────────────────────────

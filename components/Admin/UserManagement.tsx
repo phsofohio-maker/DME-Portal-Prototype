@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Staff, UserInvitation, UserRole } from '../../types';
 import { firebaseService } from '../../services/firebaseService';
 
@@ -9,6 +9,11 @@ export const UserManagement: React.FC<{ currentUser: Staff }> = ({ currentUser }
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [newInviteEmail, setNewInviteEmail] = useState('');
   const [newInviteRole, setNewInviteRole] = useState<UserRole>('nurse');
+
+  // Focus management for modal
+  const inviteTriggerRef = useRef<HTMLButtonElement>(null);
+  const modalEmailRef   = useRef<HTMLInputElement>(null);
+  const modalRef        = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     refreshData();
@@ -22,6 +27,40 @@ export const UserManagement: React.FC<{ currentUser: Staff }> = ({ currentUser }
     setStaff(staffList);
     setInvites(inviteList);
   };
+
+  // Move focus into modal when it opens; return it to trigger when it closes
+  useEffect(() => {
+    if (showInviteModal) {
+      modalEmailRef.current?.focus();
+    } else {
+      inviteTriggerRef.current?.focus();
+    }
+  }, [showInviteModal]);
+
+  // Focus trap — cycle Tab/Shift+Tab within the modal; close on Escape
+  const handleModalKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Escape') { setShowInviteModal(false); return; }
+    if (e.key !== 'Tab') return;
+
+    const modal = modalRef.current;
+    if (!modal) return;
+    const focusable = Array.from(
+      modal.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled])'
+      )
+    );
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last  = focusable[focusable.length - 1];
+
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }, []);
 
   const handleSendInvite = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,7 +98,8 @@ export const UserManagement: React.FC<{ currentUser: Staff }> = ({ currentUser }
           <h2 className="text-2xl font-bold text-slate-900 serif">Team Management</h2>
           <p className="text-slate-500">Manage staff access, roles, and pending invitations.</p>
         </div>
-        <button 
+        <button
+          ref={inviteTriggerRef}
           onClick={() => setShowInviteModal(true)}
           className="px-6 py-2.5 bg-[#2563eb] text-white rounded-xl font-bold flex items-center gap-2 hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
         >
@@ -113,12 +153,13 @@ export const UserManagement: React.FC<{ currentUser: Staff }> = ({ currentUser }
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button 
+                      <button
                         disabled={s.uid === currentUser.uid}
                         onClick={() => handleDeleteStaff(s.uid)}
+                        aria-label={`Remove staff member ${s.displayName}`}
                         className="text-slate-400 hover:text-red-500 p-1 transition-colors disabled:opacity-20"
                       >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        <svg className="w-4 h-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                       </button>
                     </td>
                   </tr>
@@ -146,11 +187,12 @@ export const UserManagement: React.FC<{ currentUser: Staff }> = ({ currentUser }
                 <div key={invite.id} className="p-3 border rounded-xl border-slate-100 bg-slate-50 relative group">
                   <div className="flex justify-between items-start mb-1">
                     <p className="text-xs font-bold text-slate-900 truncate pr-6">{invite.email}</p>
-                    <button 
+                    <button
                       onClick={() => handleRevokeInvite(invite.id)}
+                      aria-label={`Revoke invitation for ${invite.email}`}
                       className="text-slate-300 hover:text-red-500 absolute top-3 right-3"
                     >
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" /></svg>
+                      <svg className="w-3 h-3" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" /></svg>
                     </button>
                   </div>
                   <div className="flex items-center justify-between text-[10px]">
@@ -166,18 +208,30 @@ export const UserManagement: React.FC<{ currentUser: Staff }> = ({ currentUser }
 
       {/* Invite Modal */}
       {showInviteModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[300]">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-[rise_0.3s_ease_both]">
+        <div
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[300]"
+          onKeyDown={handleModalKeyDown}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowInviteModal(false); }}
+        >
+          <div
+            ref={modalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="invite-modal-title"
+            className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-[rise_0.3s_ease_both]"
+          >
             <div className="p-6 border-b border-slate-100">
-              <h3 className="text-xl font-bold text-slate-900 serif">Invite New Team Member</h3>
+              <h3 id="invite-modal-title" className="text-xl font-bold text-slate-900 serif">Invite New Team Member</h3>
               <p className="text-sm text-slate-500 mt-1">Access will be granted via their email address.</p>
             </div>
             <form onSubmit={handleSendInvite} className="p-6 space-y-4">
               <div className="space-y-1.5">
-                <label className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">Email Address</label>
-                <input 
+                <label htmlFor="invite-email" className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">Email Address</label>
+                <input
+                  ref={modalEmailRef}
+                  id="invite-email"
                   required
-                  type="email" 
+                  type="email"
                   value={newInviteEmail}
                   onChange={e => setNewInviteEmail(e.target.value)}
                   placeholder="name@parrish.com"
@@ -185,8 +239,9 @@ export const UserManagement: React.FC<{ currentUser: Staff }> = ({ currentUser }
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">System Role</label>
-                <select 
+                <label htmlFor="invite-role" className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">System Role</label>
+                <select
+                  id="invite-role"
                   value={newInviteRole}
                   onChange={e => setNewInviteRole(e.target.value as UserRole)}
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 transition-all appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22M6%209l6%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_12px_center]"
@@ -198,14 +253,14 @@ export const UserManagement: React.FC<{ currentUser: Staff }> = ({ currentUser }
                 </select>
               </div>
               <div className="flex gap-3 pt-4">
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   onClick={() => setShowInviteModal(false)}
                   className="flex-1 py-3 border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50"
                 >
                   Cancel
                 </button>
-                <button 
+                <button
                   type="submit"
                   className="flex-1 py-3 bg-[#2563eb] text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-500/20"
                 >
