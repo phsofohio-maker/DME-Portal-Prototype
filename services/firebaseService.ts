@@ -41,9 +41,10 @@ import {
   QueryDocumentSnapshot,
 } from 'firebase/firestore';
 
-import { auth, db } from './firebase';
+import { auth, db, functions } from './firebase';
 import { messaging as messagingPromise } from './firebase';
 import { getToken } from 'firebase/messaging';
+import { httpsCallable } from 'firebase/functions';
 import { retryWithBackoff } from '../utils/retryWithBackoff';
 import {
   generateConversationKey,
@@ -119,13 +120,21 @@ export const firebaseService = {
 
   /**
    * Sign in with email + password via Firebase Auth.
-   * The onAuthStateChanged listener in App.tsx handles loading the staff profile.
+   * Writes an auth.login audit entry via Cloud Function after successful auth.
    */
   login: async (email: string, password: string): Promise<void> => {
     await signInWithEmailAndPassword(auth, email, password);
+    // Fire-and-forget audit log — non-fatal if CF is unavailable during dev
+    httpsCallable(functions, 'logAuthEvent')({ action: 'auth.login' }).catch(() => {});
   },
 
   logout: async (): Promise<void> => {
+    // Log before signing out while the ID token is still valid
+    try {
+      await httpsCallable(functions, 'logAuthEvent')({ action: 'auth.logout' });
+    } catch {
+      // Non-fatal — still sign out even if audit log fails
+    }
     await signOut(auth);
   },
 

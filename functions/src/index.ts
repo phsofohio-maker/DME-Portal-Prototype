@@ -23,6 +23,7 @@ import {
   onDocumentUpdated,
 } from 'firebase-functions/v2/firestore';
 import { onCall, HttpsError, onRequest } from 'firebase-functions/v2/https';
+import { onSchedule } from 'firebase-functions/v2/scheduler';
 import * as sgMail from '@sendgrid/mail';
 import { requestStatusUpdateSchema } from './schemas';
 
@@ -569,4 +570,102 @@ export const seedCatalog = onCall(async (request) => {
   }
 
   return { message: 'Seed callable ready. Import from migration script.' };
+});
+
+// ─── Auth event audit logging (Phase 4 §7.1 — HIPAA 164.312(b)) ──────────────
+
+/**
+ * Callable function that writes auth.login / auth.logout events to the
+ * immutable audit_log collection.
+ *
+ * Why callable instead of a Firestore trigger: Firebase Auth events are not
+ * Firestore document changes, so they cannot use onDocumentCreated/Updated.
+ * The audit_log security rules block all client writes, so the client calls
+ * this function which writes via the Admin SDK (bypasses rules).
+ *
+ * The function trusts request.auth (verified by Firebase ID token) — no
+ * additional authorization check is needed since any authenticated active
+ * staff member may log their own session events.
+ */
+export const logAuthEvent = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Authentication required.');
+  }
+
+  const action = request.data?.action as string | undefined;
+  if (action !== 'auth.login' && action !== 'auth.logout') {
+    throw new HttpsError('invalid-argument', 'action must be auth.login or auth.logout');
+  }
+
+  const uid      = request.auth.uid;
+  const roleSnap = await db.doc(`staff/${uid}`).get();
+  const role     = (roleSnap.data()?.role as string) ?? 'unknown';
+
+  await db.collection('audit_log').add({
+    timestamp:    FieldValue.serverTimestamp(),
+    actorId:      uid,
+    actorRole:    role,
+    action,
+    resourceType: 'auth',
+    resourceId:   uid,
+  });
+
+  return { logged: true };
+});
+
+// ─── Scheduled data retention (Phase 4 §7.3 — HIPAA record retention) ────────
+
+/**
+ * Runs on the 1st of each month. Marks requests older than 7 years as
+ * `archived: true` (soft-archive — records are never hard-deleted).
+ *
+ * HIPAA requires 6 years for compliance documentation; many states require
+ * 7–10 years for medical records. Parrish Health uses 7 years by default.
+ * Update RETENTION_YEARS to match your state's requirements.
+ *
+ * Archived requests are excluded from the active Admin Inbox but remain
+ * queryable for audit and legal purposes.
+ */
+const RETENTION_YEARS = 7;
+
+export const scheduledDataRetention = onSchedule('0 2 1 * *', async () => {
+  const cutoff = Date.now() - RETENTION_YEARS * 365.25 * 24 * 60 * 60 * 1000;
+
+  const staleSnap = await db
+    .collection('requests')
+    .where('createdAt', '<', cutoff)
+    .where('archived', '==', false)
+    .limit(500) // process in batches to stay within function timeout
+    .get();
+
+  if (staleSnap.empty) {
+    console.log('[Retention] No requests require archiving.');
+    return;
+  }
+
+  const batch = db.batch();
+  staleSnap.docs.forEach((docSnap) => {
+    batch.update(docSnap.ref, {
+      archived:   true,
+      archivedAt: FieldValue.serverTimestamp(),
+    });
+  });
+  await batch.commit();
+
+  // Audit log entry for the archival run
+  await db.collection('audit_log').add({
+    timestamp:    FieldValue.serverTimestamp(),
+    actorId:      'system',
+    actorRole:    'admin',
+    action:       'request.update',
+    resourceType: 'request',
+    resourceId:   'batch_archive',
+    after: {
+      archivedCount: staleSnap.size,
+      retentionYears: RETENTION_YEARS,
+      cutoffTimestamp: cutoff,
+    },
+  });
+
+  console.log(`[Retention] Archived ${staleSnap.size} requests older than ${RETENTION_YEARS} years.`);
 });

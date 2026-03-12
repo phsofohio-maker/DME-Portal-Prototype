@@ -85,7 +85,7 @@ const MESSAGING_FAQ: FAQItem[] = [
   {
     question: 'Is the messaging portal secure?',
     answer:
-      'Messages are stored in Firestore with server-side access rules — only the sender and recipient can read a message. All message events are logged in the audit trail. Application-layer encryption is scheduled for a future release.',
+      'Yes. Messages are AES-GCM-256 encrypted in the browser before being stored in Firestore — the database only holds ciphertext, not readable content. Only the sender and recipient hold the decryption key. All message events are also logged in the immutable audit trail.',
   },
   {
     question: 'Can I send patient information in messages?',
@@ -118,7 +118,7 @@ const ADMIN_FAQ: FAQItem[] = [
   {
     question: 'Can I view the audit log?',
     answer:
-      'The audit log is currently accessible via the Firebase Console (Firestore → audit_log collection). A built-in audit log viewer is planned for a future release.',
+      'Yes. Go to Admin → Audit Log. The built-in viewer shows every state-changing action — request approvals, staff changes, login and logout events — with actor, timestamp, and before/after values. You can filter by action type and paginate through history. The underlying data is also accessible in the Firebase Console (Firestore → audit_log).',
   },
   {
     question: 'What is the Go-Live checklist?',
