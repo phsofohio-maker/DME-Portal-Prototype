@@ -60,9 +60,9 @@ const StatCard: React.FC<{
   color?: string;
 }> = ({ label, value, sub, color = 'text-slate-900' }) => (
   <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">{label}</p>
+    <p className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">{label}</p>
     <p className={`text-3xl font-bold ${color}`}>{value}</p>
-    {sub && <p className="text-xs text-slate-400 mt-1">{sub}</p>}
+    {sub && <p className="text-xs text-slate-500 mt-1">{sub}</p>}
   </div>
 );
 
@@ -96,7 +96,7 @@ const TrendChart: React.FC<{ series: Array<{ label: string; count: number }> }> 
         {series.map((s, i) => (
           <div key={s.label} className="flex-1 text-center">
             {i % labelEvery === 0 && (
-              <span className="text-[9px] text-slate-400">{s.label.split(' ')[1]}</span>
+              <span className="text-[9px] text-slate-500">{s.label.split(' ')[1]}</span>
             )}
           </div>
         ))}
@@ -129,7 +129,7 @@ const StatusBreakdown: React.FC<{ byStatus: Record<string, number>; total: numbe
             <div key={key}>
               <div className="flex justify-between text-xs mb-1">
                 <span className="font-medium text-slate-600">{label}</span>
-                <span className="font-bold text-slate-800">{count} <span className="font-normal text-slate-400">({pct}%)</span></span>
+                <span className="font-bold text-slate-800">{count} <span className="font-normal text-slate-500">({pct}%)</span></span>
               </div>
               <div className={`w-full h-2 rounded-full ${bg} overflow-hidden`}>
                 <div
@@ -204,7 +204,7 @@ export const AnalyticsPage: React.FC = () => {
       {/* Header */}
       <div>
         <h2 className="text-2xl font-bold text-slate-900">Analytics & KPIs</h2>
-        <p className="text-slate-500 mt-1">
+        <p className="text-slate-600 mt-1">
           Success metrics from §11 of the project plan. Review monthly to track portal adoption
           and clinical workflow efficiency.
         </p>
@@ -257,7 +257,7 @@ export const AnalyticsPage: React.FC = () => {
               </div>
               <div>
                 <p className="font-bold text-slate-800">Approval Rate</p>
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-slate-600">
                   {analytics.byStatus['approved'] ?? 0} approved of{' '}
                   {(analytics.byStatus['approved'] ?? 0) + (analytics.byStatus['denied'] ?? 0)} decided
                   requests all time.
@@ -315,9 +315,9 @@ export const AnalyticsPage: React.FC = () => {
                 <div key={metric} className="px-6 py-3 flex items-center gap-4 text-sm">
                   <div className="flex-1">
                     <p className="font-medium text-slate-800">{metric}</p>
-                    <p className="text-xs text-slate-400 mt-0.5">{note}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{note}</p>
                   </div>
-                  <span className="text-xs font-bold text-slate-500 shrink-0">{target}</span>
+                  <span className="text-xs font-bold text-slate-600 shrink-0">{target}</span>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
                     status === 'met'    ? 'bg-green-100 text-green-700' :
                     status === 'missed' ? 'bg-red-100 text-red-700' :
@@ -330,7 +330,7 @@ export const AnalyticsPage: React.FC = () => {
             </div>
           </div>
 
-          <p className="text-xs text-slate-400 text-center pb-4">
+          <p className="text-xs text-slate-500 text-center pb-4">
             Data reflects all Firestore records. Refresh the page to see the latest figures.
             For high-volume deployments, consider moving aggregations to a scheduled Cloud Function.
           </p>

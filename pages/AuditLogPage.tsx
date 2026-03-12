@@ -79,18 +79,18 @@ const AuditRow: React.FC<{ entry: AuditLogEntry }> = ({ entry }) => {
         </span>
 
         {/* Resource ID */}
-        <span className="font-mono text-xs text-slate-400 truncate hidden sm:block w-48 shrink-0">
+        <span className="font-mono text-xs text-slate-500 truncate hidden sm:block w-48 shrink-0">
           {entry.resourceId ? entry.resourceId.slice(0, 14) + (entry.resourceId.length > 14 ? '…' : '') : '—'}
         </span>
 
         {/* Actor */}
         <span className="text-xs text-slate-500 truncate flex-1 hidden md:block">
           Actor: <span className="font-mono">{entry.actorId.slice(0, 10)}…</span>
-          <span className="ml-2 text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold uppercase">{entry.actorRole}</span>
+          <span className="ml-2 text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-bold uppercase">{entry.actorRole}</span>
         </span>
 
         {/* Timestamp */}
-        <span className="text-xs text-slate-400 shrink-0 ml-auto">{ts}</span>
+        <span className="text-xs text-slate-500 shrink-0 ml-auto">{ts}</span>
 
         {/* Expand chevron */}
         {hasDiff && (
@@ -108,7 +108,7 @@ const AuditRow: React.FC<{ entry: AuditLogEntry }> = ({ entry }) => {
         <div className="px-6 pb-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
           {entry.before !== undefined && (
             <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Before</p>
+              <p className="text-[10px] font-bold text-slate-600 uppercase mb-1">Before</p>
               <pre className="text-xs bg-red-50 border border-red-100 text-red-800 rounded-lg p-3 overflow-auto max-h-32 whitespace-pre-wrap">
                 {JSON.stringify(entry.before, null, 2)}
               </pre>
@@ -116,7 +116,7 @@ const AuditRow: React.FC<{ entry: AuditLogEntry }> = ({ entry }) => {
           )}
           {entry.after !== undefined && (
             <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">After</p>
+              <p className="text-[10px] font-bold text-slate-600 uppercase mb-1">After</p>
               <pre className="text-xs bg-green-50 border border-green-100 text-green-800 rounded-lg p-3 overflow-auto max-h-32 whitespace-pre-wrap">
                 {JSON.stringify(entry.after, null, 2)}
               </pre>
@@ -178,7 +178,7 @@ export const AuditLogPage: React.FC = () => {
       {/* Header */}
       <div>
         <h2 className="text-2xl font-bold text-slate-900">Audit Log</h2>
-        <p className="text-slate-500 mt-1">
+        <p className="text-slate-600 mt-1">
           Immutable record of all system actions. Review monthly per HIPAA §164.312(b).
           This log is written by Cloud Functions — no client-side mutations are possible.
         </p>
@@ -232,8 +232,8 @@ export const AuditLogPage: React.FC = () => {
           </div>
         ) : entries.length === 0 ? (
           <div className="px-6 py-12 text-center">
-            <p className="text-slate-400 text-sm">No audit log entries found.</p>
-            <p className="text-slate-400 text-xs mt-1">Entries are created by Cloud Functions as actions occur in production.</p>
+            <p className="text-slate-500 text-sm">No audit log entries found.</p>
+            <p className="text-slate-500 text-xs mt-1">Entries are created by Cloud Functions as actions occur in production.</p>
           </div>
         ) : (
           <div>
@@ -262,7 +262,7 @@ export const AuditLogPage: React.FC = () => {
         </div>
       )}
 
-      <p className="text-xs text-slate-400 text-center pb-4">
+      <p className="text-xs text-slate-500 text-center pb-4">
         Showing {entries.length} entries. Audit log is append-only — no data can be modified or deleted.
       </p>
     </div>

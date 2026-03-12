@@ -245,7 +245,7 @@ export const HelpPage: React.FC<HelpPageProps> = ({ user }) => {
     <div className="space-y-6 max-w-3xl">
       <div>
         <h2 className="text-2xl font-bold text-slate-900">Help Center</h2>
-        <p className="text-slate-500 mt-1">
+        <p className="text-slate-600 mt-1">
           Frequently asked questions about the Parrish Health DME Portal.
         </p>
       </div>

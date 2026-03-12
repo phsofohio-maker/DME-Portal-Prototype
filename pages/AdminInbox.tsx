@@ -18,6 +18,7 @@ import { adminActionSchema, bulkAdminActionSchema } from '../lib/schemas';
 import { exportRequestPDF } from '../services/pdfService';
 import { logger } from '../services/logger';
 import { isTransient } from '../utils/retryWithBackoff';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 interface AdminInboxProps {
   user: Staff;
@@ -250,6 +251,10 @@ export const AdminInbox: React.FC<AdminInboxProps> = ({ user }) => {
     }
   };
 
+  // ── Focus traps for modals (WCAG 2.4.3) ────────────────────────────────────
+  const processModalTrapRef = useFocusTrap(!!selected);
+  const bulkModalTrapRef = useFocusTrap(!!bulkAction);
+
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
@@ -358,7 +363,7 @@ export const AdminInbox: React.FC<AdminInboxProps> = ({ user }) => {
                       <td className="px-4 py-3 capitalize text-slate-700">{req.type}</td>
                       <td className="px-4 py-3">
                         <p className="font-medium text-slate-900">{req.patientName}</p>
-                        <p className="text-xs text-slate-400">ID: {req.patientId}</p>
+                        <p className="text-xs text-slate-500">ID: {req.patientId}</p>
                       </td>
                       <td className="px-4 py-3 text-slate-600">{req.submitterName}</td>
                       <td className="px-4 py-3">{statusBadge(req.status)}</td>
@@ -403,10 +408,12 @@ export const AdminInbox: React.FC<AdminInboxProps> = ({ user }) => {
       {/* ══ Single-request process modal ══ */}
       {selected && (
         <div
+          ref={processModalTrapRef}
           role="dialog"
           aria-modal="true"
-          aria-label={`Process request ${selected.id}`}
+          aria-label={`Process request for ${selected.patientName}`}
           className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-[300]"
+          onKeyDown={(e) => { if (e.key === 'Escape') closeModal(); }}
         >
           <div className="bg-white rounded-2xl p-6 w-full max-w-xl shadow-2xl overflow-y-auto max-h-[90vh]">
             <div className="flex items-center justify-between mb-4">
@@ -601,23 +608,25 @@ export const AdminInbox: React.FC<AdminInboxProps> = ({ user }) => {
       {/* ══ Bulk action confirmation modal ══ */}
       {bulkAction && (
         <div
+          ref={bulkModalTrapRef}
           role="dialog"
           aria-modal="true"
           aria-label={`Bulk ${bulkAction} confirmation`}
           className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-[400]"
+          onKeyDown={(e) => { if (e.key === 'Escape' && !bulkProcessing) closeBulkModal(); }}
         >
           <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
             <h3 className="text-lg font-bold mb-1">
               Bulk {bulkAction === 'approved' ? 'Approve' : 'Deny'} — {selectedIds.size} Request{selectedIds.size !== 1 ? 's' : ''}
             </h3>
-            <p className="text-sm text-slate-500 mb-4">
+            <p className="text-sm text-slate-600 mb-4">
               This will {bulkAction === 'approved' ? 'approve' : 'deny'} all {selectedIds.size} selected
               request{selectedIds.size !== 1 ? 's' : ''} simultaneously.
             </p>
 
             {bulkResult ? (
               <div className="space-y-3">
-                <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-sm text-green-700">
+                <div role="status" aria-live="polite" className="bg-green-50 border border-green-200 rounded-xl p-3 text-sm text-green-700">
                   {bulkResult.succeeded} request{bulkResult.succeeded !== 1 ? 's' : ''} {bulkAction === 'approved' ? 'approved' : 'denied'} successfully.
                 </div>
                 {bulkResult.failed > 0 && (

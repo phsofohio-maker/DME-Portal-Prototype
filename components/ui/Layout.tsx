@@ -7,6 +7,7 @@ import { OfflineBanner } from './OfflineBanner';
 import { firebaseService } from '../../services/firebaseService';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../../services/firebase';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 
 interface LayoutProps {
   user: Staff;
@@ -177,10 +178,20 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, children }) => {
     menuItems.push({ label: 'Go-Live', path: '/admin/go-live', icon: <Icons.GoLive /> });
   }
 
+  const timeoutTrapRef = useFocusTrap(showTimeoutWarning);
+
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-slate-50">
+      {/* Skip to main content — WCAG 2.4.1 */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[700] focus:px-4 focus:py-2 focus:bg-blue-600 focus:text-white focus:rounded-lg focus:text-sm focus:font-bold focus:outline-none focus:ring-2 focus:ring-blue-400"
+      >
+        Skip to main content
+      </a>
+
       {/* Sidebar — Desktop */}
-      <aside className="hidden md:flex flex-col w-64 bg-slate-900 text-white p-6 sticky top-0 h-screen overflow-y-auto">
+      <aside className="hidden md:flex flex-col w-64 bg-slate-900 text-white p-6 sticky top-0 h-screen overflow-y-auto" aria-label="Main navigation">
         <div className="mb-8">
           <h1 className="text-xl font-bold tracking-tight text-blue-400">Parrish Health</h1>
           <p className="text-xs text-slate-400 mt-1 uppercase tracking-widest font-semibold">
@@ -212,7 +223,7 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, children }) => {
             </div>
             <div className="overflow-hidden flex-1">
               <p className="text-sm font-medium truncate">{user.displayName}</p>
-              <p className="text-xs text-slate-500 capitalize">{user.role}</p>
+              <p className="text-xs text-slate-400 capitalize">{user.role}</p>
             </div>
             <NotificationBell uid={user.uid} />
           </div>
@@ -242,7 +253,7 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, children }) => {
       </header>
 
       {/* Bottom Nav — Mobile */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around p-2 z-[200] overflow-x-auto">
+      <nav aria-label="Mobile navigation" className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around p-2 z-[200] overflow-x-auto">
         {menuItems.map((item) => (
           <button
             key={item.path}
@@ -259,7 +270,7 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, children }) => {
 
       <div className="flex-1 flex flex-col min-w-0">
         <OfflineBanner />
-        <main className="flex-1 p-4 md:p-8 mb-20 md:mb-0 max-w-5xl mx-auto w-full">
+        <main id="main-content" className="flex-1 p-4 md:p-8 mb-20 md:mb-0 max-w-5xl mx-auto w-full">
           {children}
         </main>
       </div>
@@ -267,6 +278,7 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, children }) => {
       {/* ── Session timeout warning modal ── */}
       {showTimeoutWarning && (
         <div
+          ref={timeoutTrapRef}
           role="alertdialog"
           aria-modal="true"
           aria-labelledby="timeout-warning-title"
@@ -282,7 +294,7 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, children }) => {
             <h2 id="timeout-warning-title" className="text-lg font-bold text-slate-900 mb-2">
               Session Expiring Soon
             </h2>
-            <p id="timeout-warning-desc" className="text-sm text-slate-500 mb-6">
+            <p id="timeout-warning-desc" className="text-sm text-slate-600 mb-6">
               For HIPAA compliance, your session will automatically end in{' '}
               <strong>2 minutes</strong> due to inactivity. Click below to stay signed in.
             </p>

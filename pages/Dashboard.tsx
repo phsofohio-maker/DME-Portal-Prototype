@@ -30,7 +30,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           <h2 className="text-2xl font-bold text-slate-900">
             Welcome back, {user.displayName}
           </h2>
-          <p className="text-slate-500">Here are your active supply and logistics requests.</p>
+          <p className="text-slate-600">Here are your active supply and logistics requests.</p>
         </div>
         <div className="hidden md:block">
           <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-lg border border-blue-100 text-sm font-medium">
@@ -41,28 +41,28 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" role="region" aria-label="Request summary">
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-          <p className="text-slate-500 text-sm font-medium">Active Requests</p>
+          <p className="text-slate-600 text-sm font-medium">Active Requests</p>
           <p className="text-3xl font-bold text-slate-900 mt-1" aria-label={`${requests.filter((r) => r.status === 'pending').length} active requests`}>
             {requests.filter((r) => r.status === 'pending').length}
           </p>
         </div>
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-          <p className="text-slate-500 text-sm font-medium">Approved</p>
-          <p className="text-3xl font-bold text-green-600 mt-1">
+          <p className="text-slate-600 text-sm font-medium">Approved</p>
+          <p className="text-3xl font-bold text-green-700 mt-1">
             {requests.filter((r) => r.status === 'approved').length}
           </p>
         </div>
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-          <p className="text-slate-500 text-sm font-medium">Info Needed</p>
+          <p className="text-slate-600 text-sm font-medium">Info Needed</p>
           <p className="text-3xl font-bold text-amber-600 mt-1">
             {requests.filter((r) => r.status === 'rmi').length}
           </p>
         </div>
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-          <p className="text-slate-500 text-sm font-medium">System Health</p>
-          <p className="text-sm font-bold text-green-500 mt-2 flex items-center">
+          <p className="text-slate-600 text-sm font-medium">System Health</p>
+          <p className="text-sm font-bold text-green-700 mt-2 flex items-center">
             <span
-              className="w-2 h-2 rounded-full bg-green-500 mr-2 inline-block animate-pulse"
+              className="w-2 h-2 rounded-full bg-green-600 mr-2 inline-block animate-pulse"
               aria-hidden="true"
             />
             Operational

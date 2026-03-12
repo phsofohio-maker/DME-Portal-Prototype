@@ -141,7 +141,7 @@ export const MFAChallenge: React.FC<MFAChallengeProps> = ({
 
           <button
             onClick={onCancel}
-            className="w-full py-2 text-sm text-slate-400 hover:text-slate-600 transition-colors"
+            className="w-full py-2 text-sm text-slate-500 hover:text-slate-700 transition-colors"
           >
             Cancel — Sign in with a different account
           </button>

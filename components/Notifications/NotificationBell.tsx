@@ -151,7 +151,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ uid }) => {
 
           <div className="max-h-96 overflow-y-auto divide-y divide-slate-50">
             {displayed.length === 0 ? (
-              <div className="p-6 text-center text-sm text-slate-400">
+              <div className="p-6 text-center text-sm text-slate-500">
                 No notifications yet
               </div>
             ) : (
@@ -169,7 +169,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ uid }) => {
                       {notif.title}
                     </p>
                     <p className="text-xs text-slate-500 mt-0.5 truncate">{notif.body}</p>
-                    <p className="text-[10px] text-slate-400 mt-1">
+                    <p className="text-[10px] text-slate-500 mt-1">
                       <time dateTime={new Date(notif.createdAt).toISOString()}>
                         {relativeTime(notif.createdAt)}
                       </time>

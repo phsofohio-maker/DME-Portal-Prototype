@@ -98,7 +98,7 @@ export const MessagingPortal: React.FC<{ currentUser: Staff }> = ({ currentUser 
           {contactsLoading ? (
             Array.from({ length: 4 }).map((_, i) => <ContactSkeleton key={i} />)
           ) : filteredContacts.length === 0 ? (
-            <div className="p-8 text-center text-slate-400 text-sm" role="status">
+            <div className="p-8 text-center text-slate-600 text-sm" role="status">
               <p>No contacts found.</p>
             </div>
           ) : (
@@ -118,7 +118,7 @@ export const MessagingPortal: React.FC<{ currentUser: Staff }> = ({ currentUser 
                   <p className={`font-bold text-sm truncate ${selectedContact?.uid === contact.uid ? 'text-slate-900' : 'text-slate-600'}`}>
                     {contact.displayName}
                   </p>
-                  <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                  <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
                     {contact.role.replace('_', ' ')}
                   </p>
                 </div>
@@ -164,7 +164,7 @@ export const MessagingPortal: React.FC<{ currentUser: Staff }> = ({ currentUser 
               className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/30"
             >
               <div className="text-center pb-4">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-white px-4 py-1 rounded-full border border-slate-100">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-white px-4 py-1 rounded-full border border-slate-100">
                   Conversation started
                 </span>
               </div>
@@ -192,7 +192,7 @@ export const MessagingPortal: React.FC<{ currentUser: Staff }> = ({ currentUser 
                       <div className={`p-4 rounded-2xl text-sm shadow-sm transition-all ${msg.senderId === currentUser.uid ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white border border-slate-100 text-slate-700 rounded-tl-none'}`}>
                         {msg.messageBody}
                       </div>
-                      <p className={`text-[9px] mt-1 font-bold text-slate-400 px-1 flex items-center gap-1 ${msg.senderId === currentUser.uid ? 'justify-end' : 'justify-start'}`}>
+                      <p className={`text-[9px] mt-1 font-bold text-slate-500 px-1 flex items-center gap-1 ${msg.senderId === currentUser.uid ? 'justify-end' : 'justify-start'}`}>
                         <time dateTime={new Date(msg.createdAt).toISOString()}>
                           {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </time>
@@ -235,7 +235,7 @@ export const MessagingPortal: React.FC<{ currentUser: Staff }> = ({ currentUser 
                   Send
                 </button>
               </div>
-              <p className="text-[9px] text-slate-400 mt-3 text-center uppercase tracking-widest font-semibold italic">
+              <p className="text-[9px] text-slate-500 mt-3 text-center uppercase tracking-widest font-semibold italic">
                 Logs are archived for clinical review and audit.
               </p>
             </form>
@@ -246,17 +246,17 @@ export const MessagingPortal: React.FC<{ currentUser: Staff }> = ({ currentUser 
               <svg className="w-10 h-10 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" /></svg>
             </div>
             <h3 className="text-xl font-bold text-slate-800 serif">Staff Communication Portal</h3>
-            <p className="text-slate-500 max-w-sm mt-3 text-sm">
+            <p className="text-slate-600 max-w-sm mt-3 text-sm">
               Select a colleague from the staff directory to begin clinical coordination in a HIPAA-compliant environment.
             </p>
             <div className="grid grid-cols-2 gap-4 mt-8 w-full max-w-md">
               <div className="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
                 <p className="text-[10px] font-bold text-green-600 uppercase tracking-widest mb-1">Encrypted</p>
-                <p className="text-xs text-slate-500">AES-256 encrypted before storage. Audit trail included.</p>
+                <p className="text-xs text-slate-600">AES-256 encrypted before storage. Audit trail included.</p>
               </div>
               <div className="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
                 <p className="text-[10px] font-bold text-teal-600 uppercase tracking-widest mb-1">Reliability</p>
-                <p className="text-xs text-slate-500">Real-time alerts for incoming clinical updates.</p>
+                <p className="text-xs text-slate-600">Real-time alerts for incoming clinical updates.</p>
               </div>
             </div>
           </div>

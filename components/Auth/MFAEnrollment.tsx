@@ -140,7 +140,7 @@ export const MFAEnrollment: React.FC<MFAEnrollmentProps> = ({
             {onSkip && (
               <button
                 onClick={onSkip}
-                className="w-full py-2 text-sm text-slate-400 hover:text-slate-600 transition-colors"
+                className="w-full py-2 text-sm text-slate-500 hover:text-slate-700 transition-colors"
               >
                 Skip for now
               </button>
@@ -220,7 +220,7 @@ export const MFAEnrollment: React.FC<MFAEnrollmentProps> = ({
             </button>
             <button
               onClick={() => setStep('qr')}
-              className="w-full py-2 text-sm text-slate-400 hover:text-slate-600 transition-colors"
+              className="w-full py-2 text-sm text-slate-500 hover:text-slate-700 transition-colors"
             >
               Back to QR Code
             </button>
@@ -262,7 +262,7 @@ export const MFAEnrollment: React.FC<MFAEnrollmentProps> = ({
             {onSkip && (
               <button
                 onClick={onSkip}
-                className="w-full py-2 text-sm text-slate-400 hover:text-slate-600"
+                className="w-full py-2 text-sm text-slate-500 hover:text-slate-700"
               >
                 Skip for now
               </button>

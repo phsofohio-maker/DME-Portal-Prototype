@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Staff } from '../../types';
 import { firebaseService } from '../../services/firebaseService';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 
 export const Onboarding: React.FC<{ user: Staff; onComplete: () => void }> = ({
   user,
@@ -25,8 +26,10 @@ export const Onboarding: React.FC<{ user: Staff; onComplete: () => void }> = ({
     onComplete();
   };
 
+  const onboardingTrapRef = useFocusTrap(true);
+
   return (
-    <div className="fixed inset-0 bg-slate-900 z-[500] flex items-center justify-center p-4">
+    <div ref={onboardingTrapRef} className="fixed inset-0 bg-slate-900 z-[500] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Staff onboarding">
       <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row h-[600px]">
         {/* Left sidebar */}
         <div className="w-full md:w-72 bg-blue-600 p-8 text-white flex flex-col">
@@ -79,17 +82,18 @@ export const Onboarding: React.FC<{ user: Staff; onComplete: () => void }> = ({
               <h2 className="text-3xl font-bold text-slate-900 serif">
                 Welcome to Parrish Health
               </h2>
-              <p className="text-slate-500">
+              <p className="text-slate-600">
                 Confirm your identity details as they will appear on requests and clinical
                 documents.
               </p>
 
               <div className="space-y-4 pt-4 flex-1">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                  <label htmlFor="onboard-name" className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
                     Full Name / Signature Name
                   </label>
                   <input
+                    id="onboard-name"
                     type="text"
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
@@ -98,10 +102,11 @@ export const Onboarding: React.FC<{ user: Staff; onComplete: () => void }> = ({
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    <label htmlFor="onboard-phone" className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
                       Phone Number
                     </label>
                     <input
+                      id="onboard-phone"
                       type="tel"
                       placeholder="(555) 000-0000"
                       value={phoneNumber}
@@ -110,10 +115,11 @@ export const Onboarding: React.FC<{ user: Staff; onComplete: () => void }> = ({
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    <label htmlFor="onboard-dept" className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
                       Primary Department
                     </label>
                     <input
+                      id="onboard-dept"
                       type="text"
                       placeholder="Home Health"
                       value={department}
@@ -137,7 +143,7 @@ export const Onboarding: React.FC<{ user: Staff; onComplete: () => void }> = ({
           {step === 2 && (
             <div className="space-y-6 flex flex-col flex-1">
               <h2 className="text-3xl font-bold text-slate-900 serif">Account Security</h2>
-              <p className="text-slate-500">
+              <p className="text-slate-600">
                 Your account is secured by Firebase Authentication. You signed in with the
                 password set via your invitation email.
               </p>
@@ -212,7 +218,7 @@ export const Onboarding: React.FC<{ user: Staff; onComplete: () => void }> = ({
           {step === 3 && (
             <div className="space-y-6 flex flex-col flex-1">
               <h2 className="text-3xl font-bold text-slate-900 serif">Ready to Begin</h2>
-              <p className="text-slate-500">
+              <p className="text-slate-600">
                 Your account is configured. Remember that all activity in this portal is
                 logged for HIPAA compliance.
               </p>
@@ -226,7 +232,7 @@ export const Onboarding: React.FC<{ user: Staff; onComplete: () => void }> = ({
                   </div>
                   <div>
                     <p className="font-bold text-slate-900">Secure Access Active</p>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-slate-600">
                       Your account is protected by Firebase Authentication.
                     </p>
                   </div>
@@ -239,7 +245,7 @@ export const Onboarding: React.FC<{ user: Staff; onComplete: () => void }> = ({
                   </div>
                   <div>
                     <p className="font-bold text-slate-900">Real-time Coordination</p>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-slate-600">
                       Requests are synced instantly across all devices for your care team.
                     </p>
                   </div>
