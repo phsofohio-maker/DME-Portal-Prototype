@@ -5,6 +5,7 @@ import { Staff, Patient } from '../../types';
 import { firebaseService } from '../../services/firebaseService';
 import { medicationFormSchema } from '../../lib/schemas';
 import { logger } from '../../services/logger';
+import { isTransient } from '../../utils/retryWithBackoff';
 
 const FieldError = ({ msg }: { msg?: string }) =>
   msg ? <p role="alert" className="text-red-500 text-xs mt-1">{msg}</p> : null;
@@ -204,8 +205,13 @@ export const MedicationForm: React.FC<MedicationFormProps> = ({ user, onSuccess 
         },
       });
       onSuccess();
-    } catch {
-      setSubmitError('Submission failed. Please check your connection and try again.');
+    } catch (err) {
+      logger.error('MedicationForm', 'Submit failed', err);
+      setSubmitError(
+        isTransient(err)
+          ? 'Network issue — your submission will sync automatically when connectivity is restored.'
+          : 'Submission failed. Please try again or contact IT support if the problem persists.'
+      );
     } finally {
       setIsSubmitting(false);
     }

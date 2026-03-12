@@ -13,7 +13,7 @@ const TRANSIENT_CODES = new Set([
   'resource-exhausted', // Quota / rate-limit briefly hit
 ]);
 
-function isTransient(error: unknown): boolean {
+export function isTransient(error: unknown): boolean {
   if (error instanceof FirebaseError) return TRANSIENT_CODES.has(error.code);
   // Generic network errors (fetch failures, offline during the write window)
   if (error instanceof TypeError && error.message.toLowerCase().includes('network')) return true;

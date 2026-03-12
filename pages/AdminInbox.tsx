@@ -16,6 +16,8 @@ import { RequestList } from '../components/Dashboard/RequestList';
 import { RequestListSkeleton } from '../components/ui/LoadingSkeleton';
 import { adminActionSchema, bulkAdminActionSchema } from '../lib/schemas';
 import { exportRequestPDF } from '../services/pdfService';
+import { logger } from '../services/logger';
+import { isTransient } from '../utils/retryWithBackoff';
 
 interface AdminInboxProps {
   user: Staff;
@@ -73,6 +75,7 @@ export const AdminInbox: React.FC<AdminInboxProps> = ({ user }) => {
   const [rmiNotes, setRmiNotes] = useState('');
   const [processing, setProcessing] = useState(false);
   const [formError, setFormError] = useState('');
+  const [actionError, setActionError] = useState('');
 
   // Escalation (within process modal)
   const [showEscalation, setShowEscalation] = useState(false);
@@ -140,30 +143,49 @@ export const AdminInbox: React.FC<AdminInboxProps> = ({ user }) => {
 
     setFormError('');
     setProcessing(true);
-    await firebaseService.updateRequestStatus(
-      selected.id,
-      status,
-      notes,
-      user.uid,
-      status === 'rmi' ? rmiNotes : undefined
-    );
-    closeModal();
-    setProcessing(false);
+    const requestId = selected.id;
+    try {
+      // Close modal optimistically — Firestore subscription will update the list
+      closeModal();
+      await firebaseService.updateRequestStatus(
+        requestId,
+        status,
+        notes,
+        user.uid,
+        status === 'rmi' ? rmiNotes : undefined
+      );
+    } catch (err) {
+      logger.error('AdminInbox', `Failed to ${status} request ${requestId}`, err);
+      setActionError(
+        isTransient(err)
+          ? 'Network issue — your action will sync when connectivity is restored.'
+          : `Failed to update request. Please try again.`
+      );
+      setTimeout(() => setActionError(''), 6000);
+    } finally {
+      setProcessing(false);
+    }
   };
 
   const handleEscalate = async () => {
     if (!selected || (!escalateTo && !flagSupervisor)) return;
     setEscalating(true);
     const targetAdmin = admins.find((a) => a.uid === escalateTo);
-    await firebaseService.escalateRequest(
-      selected.id,
-      escalateTo || undefined,
-      targetAdmin?.displayName,
-      flagSupervisor,
-      escalationNote || undefined
-    );
-    setEscalating(false);
-    setEscalationDone(true);
+    try {
+      await firebaseService.escalateRequest(
+        selected.id,
+        escalateTo || undefined,
+        targetAdmin?.displayName,
+        flagSupervisor,
+        escalationNote || undefined
+      );
+      setEscalationDone(true);
+    } catch (err) {
+      logger.error('AdminInbox', `Failed to escalate request ${selected.id}`, err);
+      setFormError('Escalation failed. Please try again.');
+    } finally {
+      setEscalating(false);
+    }
   };
 
   // ── Bulk selection helpers ──────────────────────────────────────────────────
@@ -214,12 +236,18 @@ export const AdminInbox: React.FC<AdminInboxProps> = ({ user }) => {
     }
     setBulkError('');
     setBulkProcessing(true);
-    const { succeeded, failed } = await firebaseService.bulkUpdateRequestStatus(
-      ids, bulkAction, bulkNotes, user.uid
-    );
-    setBulkProcessing(false);
-    setBulkResult({ succeeded: succeeded.length, failed: failed.length });
-    setSelectedIds(new Set());
+    try {
+      const { succeeded, failed } = await firebaseService.bulkUpdateRequestStatus(
+        ids, bulkAction, bulkNotes, user.uid
+      );
+      setBulkResult({ succeeded: succeeded.length, failed: failed.length });
+      setSelectedIds(new Set());
+    } catch (err) {
+      logger.error('AdminInbox', 'Bulk action failed', err);
+      setBulkError('Bulk operation failed. Please try again.');
+    } finally {
+      setBulkProcessing(false);
+    }
   };
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -239,6 +267,14 @@ export const AdminInbox: React.FC<AdminInboxProps> = ({ user }) => {
           </span>
         </div>
       </div>
+
+      {/* Action error banner */}
+      {actionError && (
+        <div role="alert" className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm font-medium text-red-700 flex items-center gap-2">
+          <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
+          {actionError}
+        </div>
+      )}
 
       {/* Pending requests — selectable table */}
       {loading ? (
