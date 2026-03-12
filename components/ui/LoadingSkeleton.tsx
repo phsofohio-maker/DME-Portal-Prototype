@@ -7,12 +7,7 @@
  */
 
 import React from 'react';
-
-// ─── Base Shimmer ─────────────────────────────────────────────────────────────
-
-const Shimmer: React.FC<{ className?: string }> = ({ className = '' }) => (
-  <div className={`bg-slate-200 rounded animate-pulse ${className}`} aria-hidden="true" />
-);
+import { Skeleton as Shimmer } from './Skeleton';
 
 // ─── Request Table Row Skeleton ────────────────────────────────────────────────
 

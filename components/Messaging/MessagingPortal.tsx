@@ -3,12 +3,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Staff, Communication } from '../../types';
 import { firebaseService } from '../../services/firebaseService';
 import { ContactSkeleton } from '../ui/LoadingSkeleton';
+import { MessageBubbleSkeleton } from '../ui/Skeleton';
 
 export const MessagingPortal: React.FC<{ currentUser: Staff }> = ({ currentUser }) => {
   const [contacts, setContacts] = useState<Staff[]>([]);
   const [contactsLoading, setContactsLoading] = useState(true);
   const [selectedContact, setSelectedContact] = useState<Staff | null>(null);
   const [messages, setMessages] = useState<Communication[]>([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
   const [newMessage, setNewMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -27,10 +29,14 @@ export const MessagingPortal: React.FC<{ currentUser: Staff }> = ({ currentUser 
       setMessages([]);
       return;
     }
+    setMessagesLoading(true);
     const unsubscribe = firebaseService.subscribeToMessagesBetween(
       currentUser.uid,
       selectedContact.uid,
-      setMessages
+      (data) => {
+        setMessages(data);
+        setMessagesLoading(false);
+      }
     );
     return unsubscribe;
   }, [selectedContact, currentUser.uid]);
@@ -163,7 +169,15 @@ export const MessagingPortal: React.FC<{ currentUser: Staff }> = ({ currentUser 
                 </span>
               </div>
 
-              {messages.length === 0 ? (
+              {messagesLoading ? (
+                <div className="space-y-4" role="status" aria-label="Loading messages…">
+                  <MessageBubbleSkeleton align="left" />
+                  <MessageBubbleSkeleton align="right" />
+                  <MessageBubbleSkeleton align="left" />
+                  <MessageBubbleSkeleton align="right" />
+                  <span className="sr-only">Loading messages, please wait…</span>
+                </div>
+              ) : messages.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-slate-400 space-y-3">
                   <svg className="w-12 h-12 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
                   <p className="text-sm italic">No clinical updates exchanged yet.</p>

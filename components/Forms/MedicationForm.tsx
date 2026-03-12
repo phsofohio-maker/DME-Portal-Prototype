@@ -6,6 +6,7 @@ import { firebaseService } from '../../services/firebaseService';
 import { medicationFormSchema } from '../../lib/schemas';
 import { logger } from '../../services/logger';
 import { isTransient } from '../../utils/retryWithBackoff';
+import { PatientRowSkeleton } from '../ui/Skeleton';
 
 const FieldError = ({ msg }: { msg?: string }) =>
   msg ? <p role="alert" className="text-red-500 text-xs mt-1">{msg}</p> : null;
@@ -285,7 +286,7 @@ export const MedicationForm: React.FC<MedicationFormProps> = ({ user, onSuccess 
                         </button>
                       ))
                     ) : patientSearching ? (
-                      <div className="p-4 text-center text-sm text-slate-500 animate-pulse">Searching…</div>
+                      <div>{Array.from({ length: 3 }).map((_, i) => <PatientRowSkeleton key={i} />)}</div>
                     ) : (
                       <div className="p-4 text-center text-sm text-slate-500">No patients found.</div>
                     )}
