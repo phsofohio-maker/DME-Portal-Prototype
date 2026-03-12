@@ -186,7 +186,8 @@ export type AuditAction =
   | 'invitation.create'
   | 'invitation.revoke'
   | 'auth.login'
-  | 'auth.logout';
+  | 'auth.logout'
+  | 'auth.timeout';
 
 export interface AuditLogEntry {
   id: string;

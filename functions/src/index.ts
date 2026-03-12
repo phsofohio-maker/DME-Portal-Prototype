@@ -593,8 +593,8 @@ export const logAuthEvent = onCall(async (request) => {
   }
 
   const action = request.data?.action as string | undefined;
-  if (action !== 'auth.login' && action !== 'auth.logout') {
-    throw new HttpsError('invalid-argument', 'action must be auth.login or auth.logout');
+  if (action !== 'auth.login' && action !== 'auth.logout' && action !== 'auth.timeout') {
+    throw new HttpsError('invalid-argument', 'action must be auth.login, auth.logout, or auth.timeout');
   }
 
   const uid      = request.auth.uid;

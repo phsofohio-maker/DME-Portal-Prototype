@@ -5,6 +5,8 @@ import { Staff } from '../../types';
 import { NotificationBell } from '../Notifications/NotificationBell';
 import { OfflineBanner } from './OfflineBanner';
 import { firebaseService } from '../../services/firebaseService';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../../services/firebase';
 
 interface LayoutProps {
   user: Staff;
@@ -112,6 +114,16 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, children }) => {
 
   // ── 15-minute inactivity auto-logout (HIPAA 164.312(a)(2)(iii)) ────────────
   // Warning modal appears 2 minutes before auto-logout fires.
+  // On timeout, log auth.timeout audit event before signing out.
+  const handleTimeout = useCallback(async () => {
+    try {
+      await httpsCallable(functions, 'logAuthEvent')({ action: 'auth.timeout' });
+    } catch {
+      // Non-fatal — still sign out even if audit log call fails
+    }
+    onLogout();
+  }, [onLogout]);
+
   const resetTimer = useCallback(() => {
     if (logoutTimerRef.current)  clearTimeout(logoutTimerRef.current);
     if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
@@ -121,8 +133,8 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, children }) => {
       () => setShowTimeoutWarning(true),
       INACTIVITY_TIMEOUT_MS - WARNING_BEFORE_MS
     );
-    logoutTimerRef.current = setTimeout(onLogout, INACTIVITY_TIMEOUT_MS);
-  }, [onLogout]);
+    logoutTimerRef.current = setTimeout(handleTimeout, INACTIVITY_TIMEOUT_MS);
+  }, [handleTimeout]);
 
   useEffect(() => {
     const events = ['mousedown', 'keydown', 'touchstart', 'scroll', 'mousemove'];

@@ -962,6 +962,24 @@ describe('logAuthEvent', () => {
     expect(auditLogWrites[0].actorRole).toBe('admin');
   });
 
+  it('creates audit log for auth.timeout (HIPAA auto-logoff)', async () => {
+    seedStaff('nurse-uid-1', { role: 'nurse' });
+
+    const result = await handler({
+      auth: { uid: 'nurse-uid-1' },
+      data: { action: 'auth.timeout' },
+    });
+
+    expect(result).toEqual({ logged: true });
+    expect(auditLogWrites).toHaveLength(1);
+    expect(auditLogWrites[0]).toMatchObject({
+      actorId: 'nurse-uid-1',
+      actorRole: 'nurse',
+      action: 'auth.timeout',
+      resourceType: 'auth',
+    });
+  });
+
   it('defaults role to "unknown" when staff doc missing', async () => {
     await handler({
       auth: { uid: 'ghost' },
