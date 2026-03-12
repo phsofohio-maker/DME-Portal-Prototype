@@ -161,7 +161,8 @@ export interface Communication {
   recipientId: string;
   recipientName: string;
   messageType: 'clinical' | 'general';
-  messageBody: string;
+  messageBody: string; // plaintext after decryption; ciphertext on the wire
+  iv?: string;         // AES-GCM IV (base64); present on encrypted messages only
   read: boolean;
   createdAt: number;
 }

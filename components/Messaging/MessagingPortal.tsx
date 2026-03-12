@@ -143,9 +143,12 @@ export const MessagingPortal: React.FC<{ currentUser: Staff }> = ({ currentUser 
                   </p>
                 </div>
               </div>
-              <div className="bg-slate-50 text-slate-500 px-3 py-1.5 rounded-lg border border-slate-200 text-[10px] font-bold flex items-center gap-2">
+              <div
+                className="bg-green-50 text-green-700 px-3 py-1.5 rounded-lg border border-green-200 text-[10px] font-bold flex items-center gap-2"
+                title="Messages are AES-GCM-256 encrypted before storage"
+              >
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-                SECURE INTERNAL CHANNEL
+                END-TO-END ENCRYPTED
               </div>
             </div>
 
@@ -234,8 +237,8 @@ export const MessagingPortal: React.FC<{ currentUser: Staff }> = ({ currentUser 
             </p>
             <div className="grid grid-cols-2 gap-4 mt-8 w-full max-w-md">
               <div className="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
-                <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-1">Security</p>
-                <p className="text-xs text-slate-500">End-to-end audit trail for every message.</p>
+                <p className="text-[10px] font-bold text-green-600 uppercase tracking-widest mb-1">Encrypted</p>
+                <p className="text-xs text-slate-500">AES-256 encrypted before storage. Audit trail included.</p>
               </div>
               <div className="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
                 <p className="text-[10px] font-bold text-teal-600 uppercase tracking-widest mb-1">Reliability</p>

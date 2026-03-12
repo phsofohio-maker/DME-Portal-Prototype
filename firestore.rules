@@ -153,6 +153,23 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ── Conversation encryption keys (Phase 3 §3.4) ──────────────────────────
+    // One document per conversation; conversationId = sorted UIDs joined by '_'.
+    // Only the two participants may read the shared AES key.
+    // Created by the first sender (client) when a conversation is initialized.
+    // Keys are immutable once created — no update or delete ever permitted.
+
+    match /conversationKeys/{convId} {
+      allow read:   if isAuthenticated() &&
+                      request.auth.uid in resource.data.participants;
+      allow create: if isActiveStaff() &&
+                      request.auth.uid in request.resource.data.participants &&
+                      request.resource.data.participants.size() == 2 &&
+                      request.resource.data.keys().hasAll(['participants', 'key']);
+      allow update: if false;
+      allow delete: if false;
+    }
+
     // ── Notifications (Phase 3+) ──────────────────────────────────────────────
     // Recipients can read their own notifications.
     // Recipients can update ONLY the read field.

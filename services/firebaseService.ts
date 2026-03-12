@@ -44,6 +44,11 @@ import {
 import { auth, db } from './firebase';
 import { retryWithBackoff } from '../utils/retryWithBackoff';
 import {
+  generateConversationKey,
+  encryptMessage,
+  decryptMessage,
+} from './cryptoService';
+import {
   Staff,
   Request,
   Communication,
@@ -68,6 +73,39 @@ const toRequest = (id: string, data: DocumentData): Request =>
 
 const toComm = (id: string, data: DocumentData): Communication =>
   ({ id, ...data } as Communication);
+
+// ─── Conversation key management (Phase 3 §3.4) ───────────────────────────────
+
+function getConversationId(uid1: string, uid2: string): string {
+  return [uid1, uid2].sort().join('_');
+}
+
+/**
+ * Returns the AES-GCM-256 key for a conversation, creating it on first use.
+ * Key is stored in `conversationKeys/{conversationId}` and access-controlled
+ * by Firestore Security Rules to the two participants only.
+ */
+async function getOrCreateConversationKey(uid1: string, uid2: string): Promise<string> {
+  const convId = getConversationId(uid1, uid2);
+  const keyRef = doc(db, 'conversationKeys', convId);
+  const snap = await getDoc(keyRef);
+  if (snap.exists()) return snap.data().key as string;
+
+  const key = await generateConversationKey();
+  await setDoc(keyRef, { participants: [uid1, uid2].sort(), key });
+  return key;
+}
+
+/** Decrypt a single message; pass through unchanged if it has no IV (legacy plaintext). */
+async function decryptComm(key: string, msg: Communication): Promise<Communication> {
+  if (!msg.iv) return msg;
+  try {
+    const plaintext = await decryptMessage(key, msg.iv, msg.messageBody);
+    return { ...msg, messageBody: plaintext };
+  } catch {
+    return { ...msg, messageBody: '[Unable to decrypt message]' };
+  }
+}
 
 const toInvite = (id: string, data: DocumentData): UserInvitation =>
   ({ id, ...data } as UserInvitation);
@@ -359,13 +397,19 @@ export const firebaseService = {
     uid2: string,
     callback: (messages: Communication[]) => void
   ): Unsubscribe => {
-    // Track latest snapshot from each direction, merge and re-emit on any change.
-    let sentDocs: Communication[] = [];
-    let receivedDocs: Communication[] = [];
+    // Track latest encrypted snapshot from each direction.
+    let sentEncrypted: Communication[] = [];
+    let receivedEncrypted: Communication[] = [];
 
-    const emit = () => {
-      const merged = [...sentDocs, ...receivedDocs].sort((a, b) => a.createdAt - b.createdAt);
-      callback(merged);
+    // Fetch (or create) the conversation key once — reused for every decrypt.
+    const keyPromise = getOrCreateConversationKey(uid1, uid2);
+
+    const emitDecrypted = () => {
+      const all = [...sentEncrypted, ...receivedEncrypted];
+      keyPromise.then(async (key) => {
+        const decrypted = await Promise.all(all.map((m) => decryptComm(key, m)));
+        callback(decrypted.sort((a, b) => a.createdAt - b.createdAt));
+      });
     };
 
     const unsubSent = onSnapshot(
@@ -376,8 +420,8 @@ export const firebaseService = {
         orderBy('createdAt', 'asc')
       ),
       (snap) => {
-        sentDocs = snap.docs.map((d) => toComm(d.id, d.data()));
-        emit();
+        sentEncrypted = snap.docs.map((d) => toComm(d.id, d.data()));
+        emitDecrypted();
       }
     );
 
@@ -389,8 +433,8 @@ export const firebaseService = {
         orderBy('createdAt', 'asc')
       ),
       (snap) => {
-        receivedDocs = snap.docs.map((d) => toComm(d.id, d.data()));
-        emit();
+        receivedEncrypted = snap.docs.map((d) => toComm(d.id, d.data()));
+        emitDecrypted();
       }
     );
 
@@ -403,9 +447,13 @@ export const firebaseService = {
   sendMessage: async (
     message: Omit<Communication, 'id' | 'createdAt' | 'read'>
   ): Promise<void> => {
+    const key = await getOrCreateConversationKey(message.senderId, message.recipientId);
+    const { iv, ciphertext } = await encryptMessage(key, message.messageBody);
     await retryWithBackoff(
       () => addDoc(collection(db, 'communications'), {
         ...message,
+        messageBody: ciphertext,
+        iv,
         read: false,
         createdAt: Date.now(),
       }),
