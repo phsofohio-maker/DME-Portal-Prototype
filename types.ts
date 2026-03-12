@@ -21,6 +21,7 @@ export interface Staff {
   phoneNumber?: string;
   department?: string;
   notificationPrefs?: NotificationPrefs;
+  fcmToken?: string; // Firebase Cloud Messaging device token (Phase 3.3 push)
 }
 
 export interface Patient {

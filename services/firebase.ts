@@ -13,6 +13,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 import { getFunctions } from 'firebase/functions';
+import { getMessaging, isSupported as messagingIsSupported } from 'firebase/messaging';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -33,3 +34,11 @@ export const db = initializeFirestore(app, {
 });
 
 export const functions = getFunctions(app);
+
+/**
+ * FCM messaging instance — only available in browsers that support it
+ * (requires HTTPS + service workers). Resolves to null in unsupported envs.
+ */
+export const messaging = messagingIsSupported().then((ok) =>
+  ok ? getMessaging(app) : null
+);

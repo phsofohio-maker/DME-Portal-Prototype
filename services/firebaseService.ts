@@ -42,6 +42,8 @@ import {
 } from 'firebase/firestore';
 
 import { auth, db } from './firebase';
+import { messaging as messagingPromise } from './firebase';
+import { getToken } from 'firebase/messaging';
 import { retryWithBackoff } from '../utils/retryWithBackoff';
 import {
   generateConversationKey,
@@ -497,6 +499,55 @@ export const firebaseService = {
       () => updateDoc(doc(db, 'staff', uid), { notificationPrefs: prefs, updatedAt: Date.now() }),
       'updateNotificationPrefs'
     );
+  },
+
+  /**
+   * Request browser push notification permission and register the FCM service
+   * worker. On success, the device token is saved to the staff Firestore
+   * document so Cloud Functions can deliver targeted push messages.
+   *
+   * Safe to call multiple times — exits early if permission is already granted
+   * and a token is already stored.  Returns false if unsupported or denied.
+   */
+  requestPushPermission: async (uid: string): Promise<boolean> => {
+    if (!('serviceWorker' in navigator) || !('Notification' in window)) return false;
+
+    const messaging = await messagingPromise;
+    if (!messaging) return false;
+
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') return false;
+
+    try {
+      // Register the service worker and give it the Firebase config
+      // (config values are non-secret — they identify the project, not auth keys)
+      const swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+
+      const config = {
+        apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
+        authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+        projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID,
+        storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+        messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+        appId:             import.meta.env.VITE_FIREBASE_APP_ID,
+      };
+      swReg.active?.postMessage({ type: 'FIREBASE_CONFIG', config });
+
+      const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY as string | undefined;
+      const token = await getToken(messaging, {
+        vapidKey,
+        serviceWorkerRegistration: swReg,
+      });
+
+      if (token) {
+        await updateDoc(doc(db, 'staff', uid), { fcmToken: token, updatedAt: Date.now() });
+      }
+
+      return !!token;
+    } catch (err) {
+      console.warn('[FCM] Failed to register push notifications:', err);
+      return false;
+    }
   },
 
   // ── In-App Notifications ───────────────────────────────────────────────────

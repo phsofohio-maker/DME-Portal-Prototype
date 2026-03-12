@@ -8,11 +8,15 @@
  *   - Request details
  *   - Unique document ID and generation timestamp
  *   - Approval metadata (admin, date)
+ *   - QR code linking back to the portal record (Phase 3 §3.2)
+ *
+ * Also exports a CMS-1500-style insurance claim pre-fill for DME requests.
  *
  * No PHI leaves the browser — all generation is client-side.
  */
 
 import jsPDF from 'jspdf';
+import QRCode from 'qrcode';
 import { Request, DMERequestDetails, MedicationRequestDetails, MultiMedicationRequestDetails } from '../types';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -117,9 +121,33 @@ function drawFooter(doc: jsPDF): void {
   );
 }
 
+/**
+ * Render a QR code in the bottom-right corner of the current page.
+ * The QR content is the portal URL for the given request ID so staff
+ * can scan and navigate directly to the record.
+ */
+async function drawQRCode(doc: jsPDF, requestId: string): Promise<void> {
+  const portalUrl = `${window.location.origin}/#/requests/${requestId}`;
+  const dataUrl = await QRCode.toDataURL(portalUrl, {
+    width: 64,
+    margin: 1,
+    color: { dark: '#0f172a', light: '#ffffff' },
+  });
+
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const size  = 22; // mm
+
+  doc.addImage(dataUrl, 'PNG', pageW - size - 12, pageH - size - 18, size, size);
+  doc.setTextColor(...MUTED_COLOR);
+  doc.setFontSize(6);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Scan to view record', pageW - size / 2 - 12, pageH - 15, { align: 'center' });
+}
+
 // ─── DME Request PDF ──────────────────────────────────────────────────────────
 
-export function generateDMERequestPDF(request: Request): void {
+export async function generateDMERequestPDF(request: Request): Promise<void> {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const docId = `DME-${request.id.slice(0, 8).toUpperCase()}`;
   let y = drawHeader(doc, docId);
@@ -170,12 +198,13 @@ export function generateDMERequestPDF(request: Request): void {
   }
 
   drawFooter(doc);
+  await drawQRCode(doc, request.id);
   doc.save(`${docId}-${request.patientName.replace(/\s+/g, '-')}.pdf`);
 }
 
 // ─── Medication Order PDF ─────────────────────────────────────────────────────
 
-export function generateMedicationOrderPDF(request: Request): void {
+export async function generateMedicationOrderPDF(request: Request): Promise<void> {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const docId = `MED-${request.id.slice(0, 8).toUpperCase()}`;
   let y = drawHeader(doc, docId);
@@ -246,15 +275,119 @@ export function generateMedicationOrderPDF(request: Request): void {
   }
 
   drawFooter(doc);
+  await drawQRCode(doc, request.id);
   doc.save(`${docId}-${request.patientName.replace(/\s+/g, '-')}.pdf`);
 }
 
 // ─── Unified export ───────────────────────────────────────────────────────────
 
-export function exportRequestPDF(request: Request): void {
+export async function exportRequestPDF(request: Request): Promise<void> {
   if (request.type === 'dme') {
-    generateDMERequestPDF(request);
+    await generateDMERequestPDF(request);
   } else {
-    generateMedicationOrderPDF(request);
+    await generateMedicationOrderPDF(request);
   }
+}
+
+// ─── CMS-1500 Pre-fill (Phase 3 §3.2) ────────────────────────────────────────
+
+/**
+ * Generate a CMS-1500-style insurance claim pre-fill document for a DME request.
+ * Populates all fields derivable from the portal record; leaves blanks for fields
+ * that require payer-specific data (NPI, billing codes, insured address).
+ *
+ * The output is NOT the official CMS-1500 scanned form — it is a structured
+ * document formatted for staff to manually transfer values to payer systems or
+ * attach as supporting documentation.
+ */
+export async function generateCMS1500PDF(request: Request): Promise<void> {
+  const doc   = new jsPDF({ unit: 'mm', format: 'letter' });
+  const docId = `CMS-${request.id.slice(0, 8).toUpperCase()}`;
+  const pageW = doc.internal.pageSize.getWidth();
+
+  // ── Header ──────────────────────────────────────────────────────────────────
+  doc.setFillColor(...HEADER_COLOR);
+  doc.rect(0, 0, pageW, 22, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.text('PARRISH HEALTH — CMS-1500 CLAIM PRE-FILL', 12, 10);
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'normal');
+  doc.text('For staff use — transfer values to official CMS-1500 or payer portal', 12, 16);
+  doc.text(`Doc ID: ${docId}  |  Generated: ${formatDate(Date.now())}`, pageW - 12, 16, { align: 'right' });
+
+  let y = 28;
+
+  // ── Disclaimer ──────────────────────────────────────────────────────────────
+  doc.setFillColor(254, 243, 199); // amber-50
+  doc.setDrawColor(251, 191, 36);  // amber-400
+  doc.setLineWidth(0.3);
+  doc.roundedRect(12, y, pageW - 24, 10, 1, 1, 'FD');
+  doc.setTextColor(120, 80, 0);
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'bold');
+  doc.text(
+    'This document pre-populates known fields only. Review all values before submission to payer.',
+    pageW / 2, y + 6.5, { align: 'center' }
+  );
+  y += 16;
+
+  const dme = request.details as DMERequestDetails;
+
+  // ── Box 2: Patient Name ──────────────────────────────────────────────────
+  y = drawSectionHeader(doc, y, 'Patient Information (Boxes 1–13)');
+  y = drawRow(doc, y, 'Box 2 — Patient Name',           request.patientName);
+  y = drawRow(doc, y, 'Box 1a — Insured ID / MRN',      request.patientId);
+  y = drawRow(doc, y, 'Box 3 — DOB / Sex',              '(obtain from patient record)');
+  y = drawRow(doc, y, 'Box 4 — Insured Name',           '(obtain from patient record)');
+  y = drawRow(doc, y, 'Box 5 — Patient Address',        '(obtain from patient record)');
+  y = drawRow(doc, y, 'Box 6 — Patient Relationship',   '(Self / Spouse / Child / Other)');
+  y = drawRow(doc, y, 'Box 11 — Insured Policy / Group','(obtain from insurance card)');
+  y += 3;
+
+  // ── Box 21: Diagnosis Codes ──────────────────────────────────────────────
+  y = drawSectionHeader(doc, y, 'Diagnosis Codes (Box 21)');
+  y = drawRow(doc, y, '21A — Primary ICD-10',   dme.clinical?.icd10 ?? '');
+  if (dme.clinical?.secondaryIcd10) {
+    y = drawRow(doc, y, '21B — Secondary ICD-10', dme.clinical.secondaryIcd10);
+  }
+  y += 3;
+
+  // ── Box 24: Service Information ──────────────────────────────────────────
+  y = drawSectionHeader(doc, y, 'Service / Procedure (Box 24)');
+  y = drawRow(doc, y, '24A — Date of Service',     request.createdAt ? formatDate(request.createdAt) : '');
+  y = drawRow(doc, y, '24B — Place of Service',    '12 (Home)');
+  y = drawRow(doc, y, '24D — HCPCS / Procedure',   '(select appropriate DME HCPCS code)');
+  y = drawRow(doc, y, '24E — Diagnosis Pointer',   'A');
+  y = drawRow(doc, y, '24F — Charges',             '(obtain from supplier)');
+  y = drawRow(doc, y, '24G — Days / Units',        '1');
+  y += 3;
+
+  // ── Boxes 31–33: Supplier Information ────────────────────────────────────
+  y = drawSectionHeader(doc, y, 'Supplier / Physician Information (Boxes 31–33)');
+  y = drawRow(doc, y, 'Box 17 — Referring Provider',    request.submitterName);
+  y = drawRow(doc, y, 'Box 31 — Physician Signature',   `${request.submitterName}  (electronic — ${formatDate(request.processedAt ?? request.createdAt)})`);
+  y = drawRow(doc, y, 'Box 32 — Service Facility',      'Parrish Health Systems');
+  y = drawRow(doc, y, 'Box 33 — Billing Provider',      'Parrish Health Systems');
+  y = drawRow(doc, y, 'NPI / Tax ID',                   '(obtain from billing department)');
+  y += 3;
+
+  // ── Equipment details ─────────────────────────────────────────────────────
+  y = drawSectionHeader(doc, y, 'Equipment Details (Reference)');
+  y = drawRow(doc, y, 'Category',            dme.equipment?.category ?? '');
+  y = drawRow(doc, y, 'Item',                dme.equipment?.item ?? '');
+  y = drawRow(doc, y, 'Prior Authorization', dme.clinical?.priorAuth ?? 'Not required');
+  y = drawRow(doc, y, 'Length of Need',      dme.clinical?.lengthOfNeed ?? '');
+  y = drawRow(doc, y, 'Clinical Justification', dme.clinical?.justification ?? '');
+  y += 5;
+
+  // ── Approval stamp if approved ────────────────────────────────────────────
+  if (request.status === 'approved') {
+    y = drawApprovalStamp(doc, y, request);
+  }
+
+  drawFooter(doc);
+  await drawQRCode(doc, request.id);
+  doc.save(`${docId}-CMS1500-${request.patientName.replace(/\s+/g, '-')}.pdf`);
 }

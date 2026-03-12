@@ -17,6 +17,7 @@
 
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { getMessaging } from 'firebase-admin/messaging';
 import {
   onDocumentCreated,
   onDocumentUpdated,
@@ -82,6 +83,36 @@ async function sendSlackAlert(
     }
   } catch (err) {
     console.error('[Slack] Failed to send alert:', err);
+  }
+}
+
+// ─── FCM push helper (Phase 3.3) ─────────────────────────────────────────────
+
+/**
+ * Send a Firebase Cloud Messaging push notification to a specific device token.
+ * Looks up the recipient's fcmToken from their staff document.
+ * Non-fatal — if push fails (expired token, permission revoked) the
+ * originating function still succeeds.
+ */
+async function sendPushNotification(
+  recipientId: string,
+  title: string,
+  body: string
+): Promise<void> {
+  try {
+    const staffSnap = await db.doc(`staff/${recipientId}`).get();
+    const token = staffSnap.data()?.fcmToken as string | undefined;
+    if (!token) return; // user hasn't enabled push or token not yet saved
+
+    await getMessaging().send({
+      token,
+      notification: { title, body },
+      android: { notification: { icon: 'notification_icon', color: '#2563eb' } },
+      apns: { payload: { aps: { badge: 1 } } },
+    });
+  } catch (err) {
+    // Token may be stale (e.g. user cleared browser data) — log but don't throw
+    console.warn(`[FCM] Push to ${recipientId} failed:`, err);
   }
 }
 
@@ -350,7 +381,7 @@ export const onRequestUpdated = onDocumentUpdated(
       // Non-fatal — do not throw
     }
 
-    // Create in-app notification for the submitter
+    // Create in-app notification + FCM push for the submitter
     const submitterId = after.submitterId as string | undefined;
     if (submitterId) {
       const statusLabels: Record<string, string> = {
@@ -359,13 +390,12 @@ export const onRequestUpdated = onDocumentUpdated(
         rmi:      'More Info Needed',
       };
       const label = statusLabels[after.status as string] ?? String(after.status);
-      await createNotification(
-        submitterId,
-        'request.status_change',
-        `Request ${label}`,
-        `Your request for ${(after.patientName as string) ?? 'a patient'} has been ${label.toLowerCase()}.`,
-        event.params.requestId
-      );
+      const notifTitle = `Request ${label}`;
+      const notifBody  = `Your request for ${(after.patientName as string) ?? 'a patient'} has been ${label.toLowerCase()}.`;
+      await Promise.all([
+        createNotification(submitterId, 'request.status_change', notifTitle, notifBody, event.params.requestId),
+        sendPushNotification(submitterId, notifTitle, notifBody),
+      ]);
     }
   }
 );
@@ -449,13 +479,12 @@ export const onMessageCreated = onDocumentCreated(
     const recipientId = data.recipientId as string | undefined;
     const senderName  = data.senderName  as string | undefined;
     if (recipientId && senderName) {
-      await createNotification(
-        recipientId,
-        'message.received',
-        `New message from ${senderName}`,
-        'You have a new secure message. Click to view.',
-        event.params.msgId
-      );
+      const pushTitle = `New message from ${senderName}`;
+      const pushBody  = 'You have a new secure message. Click to view.';
+      await Promise.all([
+        createNotification(recipientId, 'message.received', pushTitle, pushBody, event.params.msgId),
+        sendPushNotification(recipientId, pushTitle, pushBody),
+      ]);
 
       // Email the recipient if they have emailOnNewMessage enabled
       try {
