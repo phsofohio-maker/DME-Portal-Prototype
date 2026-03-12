@@ -1,7 +1,14 @@
 import React, { useState } from 'react';
+import { MultiFactorError, MultiFactorResolver, getMultiFactorResolver } from 'firebase/auth';
+import { auth } from '../services/firebase';
 import { firebaseService } from '../services/firebaseService';
 
-export const LoginPage: React.FC = () => {
+interface LoginPageProps {
+  /** Called when Firebase Auth requires a second factor (MFA challenge). */
+  onMFARequired?: (resolver: MultiFactorResolver) => void;
+}
+
+export const LoginPage: React.FC<LoginPageProps> = ({ onMFARequired }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -14,8 +21,19 @@ export const LoginPage: React.FC = () => {
     try {
       await firebaseService.login(email, password);
       // onAuthStateChanged in App handles setting the user state
-    } catch {
-      setError('Invalid email or password. Please check your credentials and try again.');
+    } catch (err: unknown) {
+      // Firebase throws MultiFactorError when MFA is enrolled
+      if (
+        err &&
+        typeof err === 'object' &&
+        'code' in err &&
+        (err as { code: string }).code === 'auth/multi-factor-auth-required'
+      ) {
+        const resolver = getMultiFactorResolver(auth, err as MultiFactorError);
+        onMFARequired?.(resolver);
+      } else {
+        setError('Invalid email or password. Please check your credentials and try again.');
+      }
     }
     setLoading(false);
   };

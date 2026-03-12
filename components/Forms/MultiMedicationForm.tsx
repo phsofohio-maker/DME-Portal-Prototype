@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { patientService } from '../../services/patientService';
 import { Staff, Patient } from '../../types';
 import { firebaseService } from '../../services/firebaseService';
+import { PatientRowSkeleton } from '../ui/Skeleton';
 import { multiMedicationFormSchema } from '../../lib/schemas';
 
 const FieldError = ({ msg }: { msg?: string }) =>
@@ -337,7 +338,7 @@ export const MultiMedicationForm: React.FC<MultiMedicationFormProps> = ({ user, 
                         </button>
                       ))
                     ) : patientSearching ? (
-                      <div className="p-4 text-center text-sm text-slate-500 animate-pulse">Searching…</div>
+                      <div>{Array.from({ length: 3 }).map((_, i) => <PatientRowSkeleton key={i} />)}</div>
                     ) : (
                       <div className="p-4 text-center text-sm text-slate-500">No patients found.</div>
                     )}

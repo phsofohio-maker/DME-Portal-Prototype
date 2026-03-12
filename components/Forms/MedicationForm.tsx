@@ -4,6 +4,9 @@ import { patientService } from '../../services/patientService';
 import { Staff, Patient } from '../../types';
 import { firebaseService } from '../../services/firebaseService';
 import { medicationFormSchema } from '../../lib/schemas';
+import { logger } from '../../services/logger';
+import { isTransient } from '../../utils/retryWithBackoff';
+import { PatientRowSkeleton } from '../ui/Skeleton';
 
 const FieldError = ({ msg }: { msg?: string }) =>
   msg ? <p role="alert" className="text-red-500 text-xs mt-1">{msg}</p> : null;
@@ -110,7 +113,7 @@ export const MedicationForm: React.FC<MedicationFormProps> = ({ user, onSuccess 
         setDrugResults(results);
         setIsDrugDropdownOpen(true);
       } catch (err) {
-        console.error("Failed to fetch drugs", err);
+        logger.error('MedicationForm', 'Failed to fetch drugs', err);
       } finally {
         setIsDrugLoading(false);
       }
@@ -143,7 +146,7 @@ export const MedicationForm: React.FC<MedicationFormProps> = ({ user, onSuccess 
           synonym: getProp('Prescribable Synonym') || getProp('RxNorm Synonym')
         });
       } catch (err) {
-        console.error("Failed to fetch detailed drug info", err);
+        logger.error('MedicationForm', 'Failed to fetch drug details', err);
       }
     }
   };
@@ -203,8 +206,13 @@ export const MedicationForm: React.FC<MedicationFormProps> = ({ user, onSuccess 
         },
       });
       onSuccess();
-    } catch {
-      setSubmitError('Submission failed. Please check your connection and try again.');
+    } catch (err) {
+      logger.error('MedicationForm', 'Submit failed', err);
+      setSubmitError(
+        isTransient(err)
+          ? 'Network issue — your submission will sync automatically when connectivity is restored.'
+          : 'Submission failed. Please try again or contact IT support if the problem persists.'
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -278,7 +286,7 @@ export const MedicationForm: React.FC<MedicationFormProps> = ({ user, onSuccess 
                         </button>
                       ))
                     ) : patientSearching ? (
-                      <div className="p-4 text-center text-sm text-slate-500 animate-pulse">Searching…</div>
+                      <div>{Array.from({ length: 3 }).map((_, i) => <PatientRowSkeleton key={i} />)}</div>
                     ) : (
                       <div className="p-4 text-center text-sm text-slate-500">No patients found.</div>
                     )}

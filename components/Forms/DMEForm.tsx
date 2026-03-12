@@ -6,6 +6,9 @@ import { Staff, Patient } from '../../types';
 import { firebaseService } from '../../services/firebaseService';
 import { dmeFormSchema } from '../../lib/schemas';
 import { ICD10Field } from './ICD10Field';
+import { logger } from '../../services/logger';
+import { isTransient } from '../../utils/retryWithBackoff';
+import { PatientRowSkeleton } from '../ui/Skeleton';
 
 // ─── Inline field error helper ────────────────────────────────────────────────
 const FieldError = ({ msg }: { msg?: string }) =>
@@ -114,8 +117,13 @@ export const DMEForm: React.FC<DMEFormProps> = ({ user, onSuccess }) => {
         },
       });
       onSuccess();
-    } catch {
-      setSubmitError('Submission failed. Please check your connection and try again.');
+    } catch (err) {
+      logger.error('DMEForm', 'Submit failed', err);
+      setSubmitError(
+        isTransient(err)
+          ? 'Network issue — your submission will sync automatically when connectivity is restored.'
+          : 'Submission failed. Please try again or contact IT support if the problem persists.'
+      );
     } finally {
       setLoading(false);
     }
@@ -195,7 +203,7 @@ export const DMEForm: React.FC<DMEFormProps> = ({ user, onSuccess }) => {
                         </button>
                       ))
                     ) : patientSearching ? (
-                      <div className="p-4 text-center text-sm text-slate-500 animate-pulse">Searching…</div>
+                      <div>{Array.from({ length: 3 }).map((_, i) => <PatientRowSkeleton key={i} />)}</div>
                     ) : (
                       <div className="p-4 text-center text-sm text-slate-500">No patients found.</div>
                     )}

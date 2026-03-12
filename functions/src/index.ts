@@ -592,9 +592,10 @@ export const logAuthEvent = onCall(async (request) => {
     throw new HttpsError('unauthenticated', 'Authentication required.');
   }
 
+  const VALID_AUTH_ACTIONS = ['auth.login', 'auth.logout', 'auth.timeout', 'auth.mfa_enrollment', 'auth.mfa_challenge'];
   const action = request.data?.action as string | undefined;
-  if (action !== 'auth.login' && action !== 'auth.logout') {
-    throw new HttpsError('invalid-argument', 'action must be auth.login or auth.logout');
+  if (!action || !VALID_AUTH_ACTIONS.includes(action)) {
+    throw new HttpsError('invalid-argument', `action must be one of: ${VALID_AUTH_ACTIONS.join(', ')}`);
   }
 
   const uid      = request.auth.uid;

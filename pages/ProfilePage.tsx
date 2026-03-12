@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { multiFactor } from 'firebase/auth';
+import { auth } from '../services/firebase';
 import { Staff, NotificationPrefs } from '../types';
 import { firebaseService } from '../services/firebaseService';
 
@@ -8,10 +10,19 @@ interface ProfilePageProps {
 }
 
 export const ProfilePage: React.FC<ProfilePageProps> = ({ user, onUpdate }) => {
+  const [mfaEnrolled, setMfaEnrolled] = useState<boolean | null>(null);
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [prefs, setPrefs] = useState<NotificationPrefs>(
     user.notificationPrefs ?? { emailOnStatusChange: true, emailOnNewMessage: true }
   );
+
+  // Check MFA enrollment status for admin users
+  useEffect(() => {
+    if (user.role === 'admin' && auth.currentUser) {
+      const factors = multiFactor(auth.currentUser).enrolledFactors;
+      setMfaEnrolled(factors.length > 0);
+    }
+  }, [user.role]);
 
   const updatePrefs = async (newPrefs: Partial<NotificationPrefs>) => {
     const updated = { ...prefs, ...newPrefs };
@@ -54,6 +65,28 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ user, onUpdate }) => {
             <div className="flex justify-between py-2 border-b border-slate-50">
               <dt className="text-slate-500 text-sm">Phone</dt>
               <dd className="font-bold text-slate-800">{user.phoneNumber}</dd>
+            </div>
+          )}
+          {user.role === 'admin' && mfaEnrolled !== null && (
+            <div className="flex justify-between items-center py-2 border-b border-slate-50">
+              <dt className="text-slate-500 text-sm">Multi-Factor Auth</dt>
+              <dd>
+                {mfaEnrolled ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" />
+                    </svg>
+                    TOTP Enabled
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                    </svg>
+                    Not Enrolled
+                  </span>
+                )}
+              </dd>
             </div>
           )}
         </dl>
