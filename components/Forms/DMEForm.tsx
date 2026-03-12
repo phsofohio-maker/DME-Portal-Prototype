@@ -96,7 +96,13 @@ export const DMEForm: React.FC<DMEFormProps> = ({ user, onSuccess }) => {
       setErrors(fieldErrors);
       // Scroll to first error
       const firstKey = Object.keys(fieldErrors)[0];
-      document.getElementById(`dme-${firstKey}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const firstErrorEl = document.getElementById(`dme-${firstKey}`);
+      firstErrorEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // Focus the first erroneous input for screen readers (WCAG 2.4.3)
+      setTimeout(() => {
+        const focusable = firstErrorEl?.querySelector<HTMLElement>('input, select, textarea, button');
+        focusable?.focus();
+      }, 300);
       return;
     }
 
@@ -139,7 +145,7 @@ export const DMEForm: React.FC<DMEFormProps> = ({ user, onSuccess }) => {
     <div className="max-w-3xl mx-auto pb-20">
       <div className="mb-8">
         <h2 className="text-3xl font-bold text-[#0e1f38] serif">New Equipment Request</h2>
-        <p className="text-sm text-slate-500 mt-1">Select the patient, choose equipment, and provide clinical details — all other info is pulled from the patient record.</p>
+        <p className="text-sm text-slate-600 mt-1">Select the patient, choose equipment, and provide clinical details — all other info is pulled from the patient record.</p>
       </div>
 
       {submitError && (
@@ -251,11 +257,12 @@ export const DMEForm: React.FC<DMEFormProps> = ({ user, onSuccess }) => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] uppercase font-bold text-[#374151] tracking-wider">Equipment Category <span className="text-red-500">*</span></label>
-                <select 
+                <select
                   className="w-full px-4 py-2.5 border-[1.5px] border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#2563eb]/10 focus:border-[#2563eb] outline-none transition-all appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22M6%209l6%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_12px_center]"
                   value={category}
                   onChange={(e) => { setCategory(e.target.value); setItem(''); }}
                   required
+                  aria-required="true"
                 >
                   <option value="">Select category…</option>
                   {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
@@ -263,12 +270,13 @@ export const DMEForm: React.FC<DMEFormProps> = ({ user, onSuccess }) => {
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] uppercase font-bold text-[#374151] tracking-wider">Specific Item <span className="text-red-500">*</span></label>
-                <select 
+                <select
                   className="w-full px-4 py-2.5 border-[1.5px] border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#2563eb]/10 focus:border-[#2563eb] outline-none transition-all appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22M6%209l6%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_12px_center]"
                   value={item}
                   onChange={(e) => setItem(e.target.value)}
                   disabled={!category}
                   required
+                  aria-required="true"
                 >
                   <option value="">{category ? 'Select item…' : 'Select category first…'}</option>
                   {availableItems.map(d => <option key={d.id} value={d.itemName}>{d.itemName}</option>)}
@@ -487,6 +495,7 @@ export const DMEForm: React.FC<DMEFormProps> = ({ user, onSuccess }) => {
             <button
               disabled={loading || !selectedPatient || !signed}
               type="submit"
+              aria-busy={loading}
               className="px-10 py-3 bg-gradient-to-br from-[#2563eb] to-[#0e1f38] text-white rounded-xl font-bold shadow-lg shadow-blue-500/20 hover:-translate-y-0.5 transition-all active:scale-95 disabled:opacity-50 disabled:translate-y-0"
             >
               {loading ? 'Submitting…' : 'Submit Request →'}

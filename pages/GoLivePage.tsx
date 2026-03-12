@@ -310,7 +310,7 @@ export const GoLivePage: React.FC = () => {
                       }`}>
                         {item.priority === 'required' ? 'Required' : 'Recommended'}
                       </span>
-                      <span className="text-[10px] text-slate-400 font-medium">Owner: {item.owner}</span>
+                      <span className="text-[10px] text-slate-500 font-medium">Owner: {item.owner}</span>
                     </div>
                     <p className="text-xs text-slate-500 mt-1 leading-relaxed">{item.description}</p>
                   </div>
@@ -321,7 +321,7 @@ export const GoLivePage: React.FC = () => {
         </div>
       ))}
 
-      <p className="text-xs text-slate-400 text-center pb-4">
+      <p className="text-xs text-slate-500 text-center pb-4">
         Checklist progress is saved in your browser. This is a planning tool — the authoritative
         go/no-go decision belongs to your HIPAA Security Officer and DevOps lead.
       </p>

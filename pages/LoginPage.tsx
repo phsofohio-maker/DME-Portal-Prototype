@@ -43,7 +43,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onMFARequired }) => {
       <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-slate-900">Parrish Health</h1>
-          <p className="text-slate-500 mt-2">Staff DME &amp; Logistics Portal</p>
+          <p className="text-slate-600 mt-2">Staff DME &amp; Logistics Portal</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4" noValidate>
@@ -100,7 +100,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onMFARequired }) => {
           </button>
         </form>
 
-        <div className="mt-8 pt-6 border-t border-slate-100 text-center text-xs text-slate-400">
+        <div className="mt-8 pt-6 border-t border-slate-100 text-center text-xs text-slate-500">
           PARRISH HEALTH SYSTEMS — STAFF PORTAL v2.0
         </div>
       </div>

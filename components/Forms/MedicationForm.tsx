@@ -222,7 +222,7 @@ export const MedicationForm: React.FC<MedicationFormProps> = ({ user, onSuccess 
     <div className="max-w-3xl mx-auto pb-20">
       <div className="mb-8">
         <h2 className="text-3xl font-bold text-[#0e1f38] serif">New Medication Request</h2>
-        <p className="text-sm text-slate-500 mt-1">Select a patient, search for the medication via RxNorm, then provide clinical details.</p>
+        <p className="text-sm text-slate-600 mt-1">Select a patient, search for the medication via RxNorm, then provide clinical details.</p>
       </div>
 
       {submitError && (
@@ -608,6 +608,7 @@ export const MedicationForm: React.FC<MedicationFormProps> = ({ user, onSuccess 
             <button
               disabled={isSubmitting || !selectedPatient || !selectedDrug || !signed}
               type="submit"
+              aria-busy={isSubmitting}
               className="px-10 py-3 bg-gradient-to-br from-[#2563eb] to-[#0e1f38] text-white rounded-xl font-bold shadow-lg shadow-blue-500/20 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:translate-y-0"
             >
               {isSubmitting ? 'Sending...' : 'Send to Pharmacy →'}
