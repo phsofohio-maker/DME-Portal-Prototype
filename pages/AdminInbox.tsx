@@ -18,6 +18,7 @@ import { adminActionSchema, bulkAdminActionSchema } from '../lib/schemas';
 import { exportRequestPDF } from '../services/pdfService';
 import { logger } from '../services/logger';
 import { isTransient } from '../utils/retryWithBackoff';
+import { RequestTimeline } from '../components/Admin/RequestTimeline';
 
 interface AdminInboxProps {
   user: Staff;
@@ -93,6 +94,9 @@ export const AdminInbox: React.FC<AdminInboxProps> = ({ user }) => {
   const [bulkError, setBulkError] = useState('');
   const [bulkProcessing, setBulkProcessing] = useState(false);
   const [bulkResult, setBulkResult] = useState<{ succeeded: number; failed: number } | null>(null);
+
+  // Timeline modal
+  const [timelineRequest, setTimelineRequest] = useState<Request | null>(null);
 
   // ── Subscribe to requests ───────────────────────────────────────────────────
 
@@ -373,6 +377,14 @@ export const AdminInbox: React.FC<AdminInboxProps> = ({ user }) => {
                         >
                           Process
                         </button>
+                        <button
+                          onClick={() => setTimelineRequest(req)}
+                          className="text-slate-400 hover:text-violet-600 font-medium text-xs"
+                          aria-label={`View timeline for ${req.patientName}`}
+                          title="View audit timeline"
+                        >
+                          Timeline
+                        </button>
                         {(req.escalatedTo || req.flaggedForSupervisor) && (
                           <span
                             className="text-violet-500"
@@ -396,6 +408,7 @@ export const AdminInbox: React.FC<AdminInboxProps> = ({ user }) => {
         <RequestList
           title="Processed Requests"
           requests={requests.filter((r) => r.status === 'approved' || r.status === 'denied')}
+          onSelect={(req) => setTimelineRequest(req)}
           onExport={exportRequestPDF}
         />
       )}
@@ -521,6 +534,14 @@ export const AdminInbox: React.FC<AdminInboxProps> = ({ user }) => {
                 Approve
               </button>
             </div>
+
+            {/* Timeline link */}
+            <button
+              onClick={() => { setTimelineRequest(selected); }}
+              className="w-full text-center text-xs text-violet-600 hover:text-violet-800 font-medium py-2 hover:bg-violet-50 rounded-lg transition-colors mb-2"
+            >
+              View Full Audit Timeline
+            </button>
 
             {/* Escalation section (collapsible) */}
             <div className="border border-slate-200 rounded-xl overflow-hidden">
@@ -671,6 +692,14 @@ export const AdminInbox: React.FC<AdminInboxProps> = ({ user }) => {
             )}
           </div>
         </div>
+      )}
+
+      {/* ══ Request Timeline modal ══ */}
+      {timelineRequest && (
+        <RequestTimeline
+          request={timelineRequest}
+          onClose={() => setTimelineRequest(null)}
+        />
       )}
     </div>
   );

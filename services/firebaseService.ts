@@ -668,6 +668,24 @@ export const firebaseService = {
   },
 
   /**
+   * Fetch all audit log entries for a specific resource (e.g. a request ID).
+   * Returns entries in chronological order (oldest first) for timeline display.
+   */
+  getAuditLogByResourceId: async (resourceId: string): Promise<AuditLogEntry[]> => {
+    const q = query(
+      collection(db, 'audit_log'),
+      where('resourceId', '==', resourceId),
+      orderBy('timestamp', 'asc')
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+      timestamp: d.data()['timestamp']?.toMillis?.() ?? d.data()['timestamp'] ?? 0,
+    } as AuditLogEntry));
+  },
+
+  /**
    * Fetch aggregated request counts for the analytics dashboard.
    * Returns counts by status and a 30-day daily submission series.
    */
