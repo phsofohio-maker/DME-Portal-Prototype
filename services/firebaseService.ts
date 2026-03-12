@@ -45,6 +45,7 @@ import { auth, db, functions } from './firebase';
 import { messaging as messagingPromise } from './firebase';
 import { getToken } from 'firebase/messaging';
 import { httpsCallable } from 'firebase/functions';
+import { logger } from './logger';
 import { retryWithBackoff } from '../utils/retryWithBackoff';
 import {
   generateConversationKey,
@@ -500,7 +501,7 @@ export const firebaseService = {
     }
 
     await Promise.all(batch);
-    console.log('[Seed] dme_catalog and patients collections seeded.');
+    logger.info('firebaseService', 'dme_catalog and patients collections seeded.');
   },
 
   updateNotificationPrefs: async (uid: string, prefs: NotificationPrefs): Promise<void> => {
@@ -554,7 +555,7 @@ export const firebaseService = {
 
       return !!token;
     } catch (err) {
-      console.warn('[FCM] Failed to register push notifications:', err);
+      logger.warn('firebaseService', 'Failed to register push notifications', err);
       return false;
     }
   },

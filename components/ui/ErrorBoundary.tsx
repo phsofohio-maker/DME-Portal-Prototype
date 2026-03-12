@@ -21,15 +21,16 @@ interface ErrorBoundaryProps {
 interface ErrorBoundaryState {
   hasError: boolean;
   error: Error | null;
+  copied: boolean;
 }
 
 export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, copied: false };
   }
 
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+  static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
     return { hasError: true, error };
   }
 
@@ -45,6 +46,21 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
   handleReset = () => {
     this.setState({ hasError: false, error: null });
+  };
+
+  handleReportIssue = () => {
+    const { error } = this.state;
+    const context = [
+      `Error: ${error?.message ?? 'Unknown'}`,
+      `Time: ${new Date().toISOString()}`,
+      `URL: ${window.location.href}`,
+      `UA: ${navigator.userAgent}`,
+    ].join('\n');
+    navigator.clipboard.writeText(context).then(
+      () => { this.setState({ copied: true }); setTimeout(() => this.setState({ copied: false }), 2000); },
+      () => { /* clipboard unavailable — ignore */ }
+    );
+    logger.error('ErrorBoundary', 'User reported issue', error ?? undefined, { url: window.location.href });
   };
 
   render() {
@@ -101,12 +117,18 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
             </details>
           )}
 
-          <div className="flex gap-3 justify-center">
+          <div className="flex gap-3 justify-center flex-wrap">
             <button
               onClick={this.handleReset}
               className="px-5 py-2.5 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors"
             >
               Try Again
+            </button>
+            <button
+              onClick={this.handleReportIssue}
+              className="px-5 py-2.5 border border-amber-200 bg-amber-50 rounded-xl text-sm font-bold text-amber-700 hover:bg-amber-100 transition-colors"
+            >
+              {this.state.copied ? 'Copied to Clipboard!' : 'Report Issue'}
             </button>
             <button
               onClick={this.handleReload}

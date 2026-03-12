@@ -19,6 +19,7 @@ import React, { useState, useEffect } from 'react';
 import { firebaseService } from '../services/firebaseService';
 import { Request } from '../types';
 import { AnalyticsSkeleton } from '../components/ui/LoadingSkeleton';
+import { logger } from '../services/logger';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -165,7 +166,7 @@ export const AnalyticsPage: React.FC = () => {
     firebaseService.getAnalytics()
       .then(setAnalytics)
       .catch((err) => {
-        console.error(err);
+        logger.error('AnalyticsPage', 'Failed to load analytics', err);
         setError('Failed to load analytics. Check your connection and admin permissions.');
       })
       .finally(() => setLoading(false));

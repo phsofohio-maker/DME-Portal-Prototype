@@ -4,6 +4,7 @@ import { patientService } from '../../services/patientService';
 import { Staff, Patient } from '../../types';
 import { firebaseService } from '../../services/firebaseService';
 import { medicationFormSchema } from '../../lib/schemas';
+import { logger } from '../../services/logger';
 
 const FieldError = ({ msg }: { msg?: string }) =>
   msg ? <p role="alert" className="text-red-500 text-xs mt-1">{msg}</p> : null;
@@ -110,7 +111,7 @@ export const MedicationForm: React.FC<MedicationFormProps> = ({ user, onSuccess 
         setDrugResults(results);
         setIsDrugDropdownOpen(true);
       } catch (err) {
-        console.error("Failed to fetch drugs", err);
+        logger.error('MedicationForm', 'Failed to fetch drugs', err);
       } finally {
         setIsDrugLoading(false);
       }
@@ -143,7 +144,7 @@ export const MedicationForm: React.FC<MedicationFormProps> = ({ user, onSuccess 
           synonym: getProp('Prescribable Synonym') || getProp('RxNorm Synonym')
         });
       } catch (err) {
-        console.error("Failed to fetch detailed drug info", err);
+        logger.error('MedicationForm', 'Failed to fetch drug details', err);
       }
     }
   };

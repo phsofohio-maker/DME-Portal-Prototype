@@ -16,6 +16,7 @@ import { firebaseService } from '../services/firebaseService';
 import { AuditLogEntry, AuditAction } from '../types';
 import { DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { AuditLogSkeleton } from '../components/ui/LoadingSkeleton';
+import { logger } from '../services/logger';
 
 // ─── Action label map ─────────────────────────────────────────────────────────
 
@@ -153,7 +154,7 @@ export const AuditLogPage: React.FC = () => {
       setHasMore(newCursor !== null);
     } catch (err) {
       setError('Failed to load audit log. Ensure you have admin access and Firestore rules are deployed.');
-      console.error(err);
+      logger.error('AuditLogPage', 'Failed to load audit log', err);
     } finally {
       setLoading(false);
       setLoadingMore(false);

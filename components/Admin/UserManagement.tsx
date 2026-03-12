@@ -9,6 +9,8 @@ export const UserManagement: React.FC<{ currentUser: Staff }> = ({ currentUser }
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [newInviteEmail, setNewInviteEmail] = useState('');
   const [newInviteRole, setNewInviteRole] = useState<UserRole>('nurse');
+  const [errorBanner, setErrorBanner] = useState('');
+  const [confirmDeleteUid, setConfirmDeleteUid] = useState<string | null>(null);
 
   // Focus management for modal
   const inviteTriggerRef = useRef<HTMLButtonElement>(null);
@@ -75,12 +77,20 @@ export const UserManagement: React.FC<{ currentUser: Staff }> = ({ currentUser }
     refreshData();
   };
 
-  const handleDeleteStaff = async (uid: string) => {
-    if (uid === currentUser.uid) return alert("You cannot delete yourself.");
-    if (confirm("Are you sure you want to remove this staff member? They will lose all access immediately.")) {
-      await firebaseService.deleteStaff(uid);
-      refreshData();
+  const handleDeleteStaff = (uid: string) => {
+    if (uid === currentUser.uid) {
+      setErrorBanner('You cannot remove your own account.');
+      setTimeout(() => setErrorBanner(''), 4000);
+      return;
     }
+    setConfirmDeleteUid(uid);
+  };
+
+  const confirmDelete = async () => {
+    if (!confirmDeleteUid) return;
+    await firebaseService.deleteStaff(confirmDeleteUid);
+    setConfirmDeleteUid(null);
+    refreshData();
   };
 
   const getRoleColor = (role: string) => {
@@ -107,6 +117,14 @@ export const UserManagement: React.FC<{ currentUser: Staff }> = ({ currentUser }
           Invite Staff Member
         </button>
       </div>
+
+      {/* Error banner */}
+      {errorBanner && (
+        <div role="alert" className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm font-medium text-red-700 flex items-center gap-2">
+          <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
+          {errorBanner}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Staff Table */}
@@ -268,6 +286,34 @@ export const UserManagement: React.FC<{ currentUser: Staff }> = ({ currentUser }
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm delete dialog */}
+      {confirmDeleteUid && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[300]">
+          <div role="alertdialog" aria-labelledby="confirm-delete-title" aria-describedby="confirm-delete-desc" className="bg-white rounded-2xl w-full max-w-sm shadow-2xl p-6">
+            <h3 id="confirm-delete-title" className="text-lg font-bold text-slate-900 mb-2">Remove Staff Member?</h3>
+            <p id="confirm-delete-desc" className="text-sm text-slate-500 mb-6">
+              Are you sure you want to remove this staff member? They will lose all access immediately.
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteUid(null)}
+                className="flex-1 py-2.5 border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDelete}
+                className="flex-1 py-2.5 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-colors shadow-lg shadow-red-500/20"
+              >
+                Remove
+              </button>
+            </div>
           </div>
         </div>
       )}
