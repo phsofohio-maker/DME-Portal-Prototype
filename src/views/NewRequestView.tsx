@@ -472,6 +472,7 @@ function MedicationForm({
     justification:  "",
   });
   const [errors, setErrors] = useState<Partial<MedFormValues>>({});
+  const [autoFilled, setAutoFilled] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
@@ -552,34 +553,45 @@ function MedicationForm({
             route: drug.route || "",
           }));
           setErrors((e) => ({ ...e, drugName: "" }));
+          if (drug.strength || drug.doseForm || drug.route) {
+            setAutoFilled(true);
+            setTimeout(() => setAutoFilled(false), 2000);
+          }
         }}
         label="Medication"
         required
         error={errors.drugName}
       />
 
-      {/* Auto-filled drug details row */}
-      {vals.drugName && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
-          <Input
-            label="Strength"
-            placeholder="e.g. 10 MG"
-            value={vals.strength}
-            onChange={(e) => set("strength", e.target.value)}
-          />
-          <Input
-            label="Dose Form"
-            placeholder="e.g. Tab"
-            value={vals.doseForm}
-            onChange={(e) => set("doseForm", e.target.value)}
-          />
-          <Input
-            label="Route"
-            placeholder="e.g. Oral"
-            value={vals.route}
-            onChange={(e) => set("route", e.target.value)}
-          />
-        </div>
+      {/* Drug details row (always visible) */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, padding: 14, border: `1px solid ${autoFilled ? T.accent + "60" : T.borderLight}`, borderRadius: T.radiusSm, transition: "border-color 0.3s" }}>
+        <Input
+          label="Strength"
+          placeholder="e.g. 10 MG"
+          value={vals.strength}
+          onChange={(e) => set("strength", e.target.value)}
+        />
+        <Input
+          label="Dose Form"
+          placeholder="e.g. Tab"
+          value={vals.doseForm}
+          onChange={(e) => set("doseForm", e.target.value)}
+        />
+        <Input
+          label="Route"
+          placeholder="e.g. Oral"
+          value={vals.route}
+          onChange={(e) => set("route", e.target.value)}
+        />
+      </div>
+      {autoFilled && (
+        <span style={{
+          fontSize: 10, color: T.accent, fontWeight: 500,
+          marginTop: -12, display: "block",
+          transition: "opacity 0.3s",
+        }}>
+          Auto-filled from RxNorm — values are editable
+        </span>
       )}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
@@ -704,6 +716,7 @@ function MultiMedForm({
   const [indicationCode, setIndicationCode] = useState("");
   const [indicationDesc, setIndicationDesc] = useState("");
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
+  const [rowAutoFilled, setRowAutoFilled] = useState<Record<string, boolean>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
@@ -857,6 +870,10 @@ function MultiMedForm({
                     updateRow(row.uid, "strength", drug.strength || "");
                     updateRow(row.uid, "doseForm", drug.doseForm || "");
                     updateRow(row.uid, "route", drug.route || "");
+                    if (drug.strength || drug.doseForm || drug.route) {
+                      setRowAutoFilled((prev) => ({ ...prev, [row.uid]: true }));
+                      setTimeout(() => setRowAutoFilled((prev) => ({ ...prev, [row.uid]: false })), 2000);
+                    }
                   }}
                   placeholder="Search medication…"
                   error={rowErrors[row.uid]}
@@ -885,28 +902,35 @@ function MultiMedForm({
               </button>
             </div>
 
-            {/* Row 2: Auto-filled chips (Strength | Form | Route) */}
-            {row.drugName && (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, padding: "6px 8px", background: T.bgSub, borderRadius: T.radiusSm }}>
-                <input
-                  placeholder="Strength"
-                  value={row.strength}
-                  onChange={(e) => updateRow(row.uid, "strength", e.target.value)}
-                  style={{ ...inlineInputStyle, fontSize: 12, padding: "6px 8px", background: T.bgSub, border: `1px solid ${T.borderLight}` }}
-                />
-                <input
-                  placeholder="Form"
-                  value={row.doseForm}
-                  onChange={(e) => updateRow(row.uid, "doseForm", e.target.value)}
-                  style={{ ...inlineInputStyle, fontSize: 12, padding: "6px 8px", background: T.bgSub, border: `1px solid ${T.borderLight}` }}
-                />
-                <input
-                  placeholder="Route"
-                  value={row.route}
-                  onChange={(e) => updateRow(row.uid, "route", e.target.value)}
-                  style={{ ...inlineInputStyle, fontSize: 12, padding: "6px 8px", background: T.bgSub, border: `1px solid ${T.borderLight}` }}
-                />
-              </div>
+            {/* Row 2: Drug detail fields (always visible) */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, padding: "6px 8px", background: T.bgSub, borderRadius: T.radiusSm, border: `1px solid ${rowAutoFilled[row.uid] ? T.accent + "60" : "transparent"}`, transition: "border-color 0.3s" }}>
+              <input
+                placeholder="Strength"
+                value={row.strength}
+                onChange={(e) => updateRow(row.uid, "strength", e.target.value)}
+                style={{ ...inlineInputStyle, fontSize: 12, padding: "6px 8px", background: T.bgSub, border: `1px solid ${T.borderLight}` }}
+              />
+              <input
+                placeholder="Form"
+                value={row.doseForm}
+                onChange={(e) => updateRow(row.uid, "doseForm", e.target.value)}
+                style={{ ...inlineInputStyle, fontSize: 12, padding: "6px 8px", background: T.bgSub, border: `1px solid ${T.borderLight}` }}
+              />
+              <input
+                placeholder="Route"
+                value={row.route}
+                onChange={(e) => updateRow(row.uid, "route", e.target.value)}
+                style={{ ...inlineInputStyle, fontSize: 12, padding: "6px 8px", background: T.bgSub, border: `1px solid ${T.borderLight}` }}
+              />
+            </div>
+            {rowAutoFilled[row.uid] && (
+              <span style={{
+                fontSize: 10, color: T.accent, fontWeight: 500,
+                marginTop: -4, display: "block",
+                transition: "opacity 0.3s",
+              }}>
+                Auto-filled from RxNorm — values are editable
+              </span>
             )}
 
             {/* Row 3: Frequency + Qty + Refills */}

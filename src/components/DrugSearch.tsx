@@ -55,6 +55,7 @@ export default function DrugSearch({
   const [activeIdx, setActiveIdx] = useState(-1);
   const [focused, setFocused] = useState(false);
   const [noResults, setNoResults] = useState(false);
+  const [approxOnly, setApproxOnly] = useState(false);
   const [enriching, setEnriching] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -63,30 +64,79 @@ export default function DrugSearch({
   useEffect(() => { setQuery(value); }, [value]);
 
   const search = useCallback(async (q: string) => {
-    if (q.trim().length < 2) { setResults([]); setOpen(false); return; }
+    if (q.trim().length < 2) { setResults([]); setOpen(false); setApproxOnly(false); return; }
     setLoading(true);
-    try {
-      const url = `https://rxnav.nlm.nih.gov/REST/approximateTerm.json?term=${encodeURIComponent(q)}&maxEntries=8`;
-      const res = await fetch(url);
+    setApproxOnly(false);
+
+    function timedFetch(url: string): Promise<Response> {
+      const ctrl = new AbortController();
+      const id = setTimeout(() => ctrl.abort(), 3000);
+      return fetch(url, { signal: ctrl.signal }).finally(() => clearTimeout(id));
+    }
+
+    async function fetchDrugs(term: string): Promise<Drug[]> {
+      const res = await timedFetch(`https://rxnav.nlm.nih.gov/REST/drugs.json?name=${encodeURIComponent(term)}`);
+      const data = await res.json() as {
+        drugGroup?: {
+          conceptGroup?: Array<{
+            tty?: string;
+            conceptProperties?: Array<{ rxcui: string; name: string; tty: string }>;
+          }>;
+        };
+      };
+      const items: Drug[] = [];
+      const seen = new Set<string>();
+      for (const group of data.drugGroup?.conceptGroup ?? []) {
+        if (group.tty !== "SCD" && group.tty !== "SBD") continue;
+        for (const cp of group.conceptProperties ?? []) {
+          if (cp.name && !seen.has(cp.rxcui)) {
+            seen.add(cp.rxcui);
+            items.push({ name: cp.name, rxcui: cp.rxcui });
+          }
+        }
+      }
+      return items;
+    }
+
+    async function fetchApprox(term: string): Promise<Drug[]> {
+      const res = await timedFetch(`https://rxnav.nlm.nih.gov/REST/approximateTerm.json?term=${encodeURIComponent(term)}&maxEntries=12`);
       const data = await res.json() as {
         approximateGroup?: { candidate?: Array<{ rxcui: string; name: string }> };
       };
-      const candidates = data.approximateGroup?.candidate ?? [];
-      // Deduplicate by name (RxNav can return the same drug name with multiple RxAUI entries)
-      const seen = new Set<string>();
       const items: Drug[] = [];
-      for (const c of candidates) {
+      const seen = new Set<string>();
+      for (const c of data.approximateGroup?.candidate ?? []) {
         if (c.name && !seen.has(c.name)) {
           seen.add(c.name);
           items.push({ name: c.name, rxcui: c.rxcui });
         }
       }
-      setResults(items);
-      setNoResults(items.length === 0);
+      return items;
+    }
+
+    try {
+      const [drugsResult, approxResult] = await Promise.allSettled([fetchDrugs(q), fetchApprox(q)]);
+      const drugsItems = drugsResult.status === "fulfilled" ? drugsResult.value : [];
+      const approxItems = approxResult.status === "fulfilled" ? approxResult.value : [];
+
+      // Merge: primary first, then approx deduped by rxcui
+      const seenCui = new Set(drugsItems.map((d) => d.rxcui));
+      const merged: Drug[] = [...drugsItems];
+      for (const a of approxItems) {
+        if (!seenCui.has(a.rxcui)) {
+          seenCui.add(a.rxcui);
+          merged.push(a);
+        }
+      }
+      const capped = merged.slice(0, 10);
+      setResults(capped);
+      setNoResults(capped.length === 0);
+      setApproxOnly(drugsItems.length === 0 && approxItems.length > 0);
       setOpen(true);
     } catch {
       setResults([]);
       setNoResults(true);
+      setApproxOnly(false);
       setOpen(true);
     } finally {
       setLoading(false);
@@ -97,6 +147,7 @@ export default function DrugSearch({
     setQuery(val);
     setActiveIdx(-1);
     setNoResults(false);
+    setApproxOnly(false);
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => search(val), 320);
   }
@@ -204,6 +255,11 @@ export default function DrugSearch({
               overflow: "hidden",
             }}
           >
+            {approxOnly && results.length > 0 && (
+              <div style={{ padding: "6px 12px", fontSize: 11, color: T.info, fontWeight: 500, background: T.infoLight, borderBottom: `1px solid ${T.borderLight}` }}>
+                Showing approximate matches
+              </div>
+            )}
             {results.map((drug, i) => (
               <div
                 key={drug.rxcui}
