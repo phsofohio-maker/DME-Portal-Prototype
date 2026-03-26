@@ -115,7 +115,7 @@ const REQUESTS = [
   },
   {
     id: 'r3', patientId: 'p3', submittedBy: 's5', submittedAt: '2026-03-14T11:00:00Z', status: 'rmi',
-    details: { type: 'multi_medication', drugs: [{ drugName: 'Warfarin 5mg', rxcui: '855333', quantity: 30, refills: 3 }, { drugName: 'Metformin 500mg', rxcui: '861007', quantity: 60, refills: 2 }, { drugName: 'Sertraline 50mg', rxcui: '312940', quantity: 30, refills: 5 }], pharmacy: 'Kroger Pharmacy - Lancaster', justification: 'Monthly refill for established medication regimen.' },
+    details: { type: 'multi_medication', startDate: '2026-03-14', indication: { code: 'I48.91', description: 'Unspecified atrial fibrillation' }, drugs: [{ drugName: 'Warfarin 5mg', rxcui: '855333', strength: '5 MG', doseForm: 'Tab', route: 'Oral', frequency: 'QD', quantity: 30, refills: 3 }, { drugName: 'Metformin 500mg', rxcui: '861007', strength: '500 MG', doseForm: 'Tab', route: 'Oral', frequency: 'BID', quantity: 60, refills: 2 }, { drugName: 'Sertraline 50mg', rxcui: '312940', strength: '50 MG', doseForm: 'Tab', route: 'Oral', frequency: 'QD', quantity: 30, refills: 5 }], pharmacy: 'Kroger Pharmacy - Lancaster', justification: 'Monthly refill for established medication regimen.' },
     adminNotes: 'Please confirm current INR reading before warfarin refill can be approved.',
     processedAt: '2026-03-14T16:45:00Z', processedBy: 's1',
   },
@@ -127,7 +127,7 @@ const REQUESTS = [
   },
   {
     id: 'r5', patientId: 'p5', submittedBy: 's2', submittedAt: '2026-03-12T08:45:00Z', status: 'approved',
-    details: { type: 'medication', drugName: 'Furosemide 40mg', rxcui: '310430', quantity: 30, refills: 2, pharmacy: 'CVS Pharmacy - Gahanna', justification: 'Patient showing signs of fluid retention. Physician ordered dose increase.' },
+    details: { type: 'medication', drugName: 'Furosemide 40mg', rxcui: '310430', strength: '40 MG', doseForm: 'Tab', route: 'Oral', frequency: 'QD', startDate: '2026-03-12', indication: { code: 'I50.32', description: 'Chronic diastolic (congestive) heart failure' }, quantity: 30, refills: 2, pharmacy: 'CVS Pharmacy - Gahanna', justification: 'Patient showing signs of fluid retention. Physician ordered dose increase.' },
     adminNotes: 'Approved. Physician order on file.',
     processedAt: '2026-03-12T13:00:00Z', processedBy: 's1',
   },
@@ -139,13 +139,13 @@ const REQUESTS = [
   },
   {
     id: 'r7', patientId: 'p1', submittedBy: 's2', submittedAt: '2026-03-10T09:00:00Z', status: 'approved',
-    details: { type: 'multi_medication', drugs: [{ drugName: 'Lisinopril 10mg', rxcui: '314077', quantity: 30, refills: 3 }, { drugName: 'Atorvastatin 40mg', rxcui: '617312', quantity: 30, refills: 3 }, { drugName: 'Metformin 1000mg', rxcui: '861008', quantity: 60, refills: 2 }, { drugName: 'Furosemide 20mg', rxcui: '310429', quantity: 30, refills: 1 }], pharmacy: 'Walgreens - Broad St Columbus' },
+    details: { type: 'multi_medication', startDate: '2026-03-10', indication: { code: 'I10', description: 'Essential (primary) hypertension' }, drugs: [{ drugName: 'Lisinopril 10mg', rxcui: '314077', strength: '10 MG', doseForm: 'Tab', route: 'Oral', frequency: 'QD', quantity: 30, refills: 3 }, { drugName: 'Atorvastatin 40mg', rxcui: '617312', strength: '40 MG', doseForm: 'Tab', route: 'Oral', frequency: 'QHS', quantity: 30, refills: 3 }, { drugName: 'Metformin 1000mg', rxcui: '861008', strength: '1000 MG', doseForm: 'Tab', route: 'Oral', frequency: 'BID', quantity: 60, refills: 2 }, { drugName: 'Furosemide 20mg', rxcui: '310429', strength: '20 MG', doseForm: 'Tab', route: 'Oral', frequency: 'QD', quantity: 30, refills: 1 }], pharmacy: 'Walgreens - Broad St Columbus' },
     adminNotes: 'Approved. All medications verified against current care plan.',
     processedAt: '2026-03-10T14:20:00Z', processedBy: 's1',
   },
   {
     id: 'r8', patientId: 'p6', submittedBy: 's4', submittedAt: '2026-03-09T15:50:00Z', status: 'pending',
-    details: { type: 'medication', drugName: 'Gabapentin 300mg', rxcui: '310431', quantity: 90, refills: 1, pharmacy: 'Rite Aid - Springfield', justification: 'Gabapentin prescribed for neuropathic pain associated with MS.' },
+    details: { type: 'medication', drugName: 'Gabapentin 300mg', rxcui: '310431', strength: '300 MG', doseForm: 'Cap', route: 'Oral', frequency: 'TID', startDate: '2026-03-09', indication: { code: 'G35', description: 'Multiple sclerosis' }, quantity: 90, refills: 1, pharmacy: 'Rite Aid - Springfield', justification: 'Gabapentin prescribed for neuropathic pain associated with MS.' },
   },
 ];
 

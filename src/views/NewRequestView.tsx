@@ -11,7 +11,12 @@ import { calcAge } from "../utils/formatting";
 import { typeInfo } from "../utils/statusHelpers";
 import { DME_CATALOG } from "../data/dmeCatalog";
 import { firebaseService } from "../services/firebaseService";
+import { FREQUENCY_OPTIONS } from "../data/frequencyOptions";
 import type { Staff, Patient, RequestType, Drug } from "../types";
+
+function todayISO(): string {
+  return new Date().toISOString().split("T")[0];
+}
 
 // ─── Patient snapshot ─────────────────────────────────────────────────────────
 
@@ -424,6 +429,13 @@ interface MedFormValues {
   patientId: string;
   drugName: string;
   rxcui: string;
+  strength: string;
+  doseForm: string;
+  route: string;
+  frequency: string;
+  startDate: string;
+  indicationCode: string;
+  indicationDesc: string;
   quantity: string;
   refills: string;
   pharmacy: string;
@@ -444,13 +456,20 @@ function MedicationForm({
   onBack: () => void;
 }) {
   const [vals, setVals] = useState<MedFormValues>({
-    patientId:     preselectedPatient,
-    drugName:      "",
-    rxcui:         "",
-    quantity:      "30",
-    refills:       "0",
-    pharmacy:      "",
-    justification: "",
+    patientId:      preselectedPatient,
+    drugName:       "",
+    rxcui:          "",
+    strength:       "",
+    doseForm:       "",
+    route:          "",
+    frequency:      "",
+    startDate:      todayISO(),
+    indicationCode: "",
+    indicationDesc: "",
+    quantity:       "30",
+    refills:        "0",
+    pharmacy:       "",
+    justification:  "",
   });
   const [errors, setErrors] = useState<Partial<MedFormValues>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -467,6 +486,8 @@ function MedicationForm({
     if (!vals.drugName)  e.drugName  = "Medication is required.";
     if (!vals.quantity || Number(vals.quantity) < 1) e.quantity = "Quantity must be at least 1.";
     if (!vals.pharmacy.trim()) e.pharmacy = "Pharmacy is required.";
+    if (!vals.frequency) e.frequency = "Frequency is required.";
+    if (!vals.startDate) e.startDate = "Start date is required.";
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -483,6 +504,12 @@ function MedicationForm({
           type:          "medication",
           drugName:      vals.drugName,
           rxcui:         vals.rxcui,
+          strength:      vals.strength || undefined,
+          doseForm:      vals.doseForm || undefined,
+          route:         vals.route || undefined,
+          frequency:     vals.frequency || undefined,
+          startDate:     vals.startDate || undefined,
+          indication:    vals.indicationCode ? { code: vals.indicationCode, description: vals.indicationDesc } : undefined,
           quantity:      Number(vals.quantity),
           refills:       Number(vals.refills),
           pharmacy:      vals.pharmacy,
@@ -516,13 +543,67 @@ function MedicationForm({
       <DrugSearch
         value={vals.drugName}
         onSelect={(drug: Drug) => {
-          setVals((v) => ({ ...v, drugName: drug.name, rxcui: drug.rxcui }));
+          setVals((v) => ({
+            ...v,
+            drugName: drug.name,
+            rxcui: drug.rxcui,
+            strength: drug.strength || "",
+            doseForm: drug.doseForm || "",
+            route: drug.route || "",
+          }));
           setErrors((e) => ({ ...e, drugName: "" }));
         }}
         label="Medication"
         required
         error={errors.drugName}
       />
+
+      {/* Auto-filled drug details row */}
+      {vals.drugName && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
+          <Input
+            label="Strength"
+            placeholder="e.g. 10 MG"
+            value={vals.strength}
+            onChange={(e) => set("strength", e.target.value)}
+          />
+          <Input
+            label="Dose Form"
+            placeholder="e.g. Tab"
+            value={vals.doseForm}
+            onChange={(e) => set("doseForm", e.target.value)}
+          />
+          <Input
+            label="Route"
+            placeholder="e.g. Oral"
+            value={vals.route}
+            onChange={(e) => set("route", e.target.value)}
+          />
+        </div>
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+        <Select
+          label="Frequency"
+          required
+          value={vals.frequency}
+          onChange={(e) => set("frequency", e.target.value)}
+          error={errors.frequency}
+        >
+          <option value="">Select frequency…</option>
+          {FREQUENCY_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </Select>
+        <Input
+          label="Start Date"
+          required
+          type="date"
+          value={vals.startDate}
+          onChange={(e) => set("startDate", e.target.value)}
+          error={errors.startDate}
+        />
+      </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
         <Input
@@ -553,6 +634,16 @@ function MedicationForm({
         error={errors.pharmacy}
       />
 
+      <Icd10Search
+        code={vals.indicationCode}
+        description={vals.indicationDesc}
+        onSelect={(code, desc) => {
+          setVals((v) => ({ ...v, indicationCode: code, indicationDesc: desc }));
+        }}
+        label="Indication (ICD-10)"
+        error=""
+      />
+
       <Input
         as="textarea"
         label="Notes (optional)"
@@ -580,6 +671,10 @@ interface DrugRow {
   uid: string;
   drugName: string;
   rxcui: string;
+  strength: string;
+  doseForm: string;
+  route: string;
+  frequency: string;
   quantity: string;
   refills: string;
 }
@@ -600,17 +695,21 @@ function MultiMedForm({
   const [patientId, setPatientId] = useState(preselectedPatient);
   const [patientError, setPatientError] = useState("");
   const [rows, setRows] = useState<DrugRow[]>([
-    { uid: "row-0", drugName: "", rxcui: "", quantity: "30", refills: "0" },
+    { uid: "row-0", drugName: "", rxcui: "", strength: "", doseForm: "", route: "", frequency: "", quantity: "30", refills: "0" },
   ]);
   const [pharmacy, setPharmacy] = useState("");
   const [pharmacyError, setPharmacyError] = useState("");
+  const [startDate, setStartDate] = useState(todayISO());
+  const [startDateError, setStartDateError] = useState("");
+  const [indicationCode, setIndicationCode] = useState("");
+  const [indicationDesc, setIndicationDesc] = useState("");
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
   function addRow() {
     if (rows.length >= 10) return;
-    setRows((r) => [...r, { uid: `row-${Date.now()}`, drugName: "", rxcui: "", quantity: "30", refills: "0" }]);
+    setRows((r) => [...r, { uid: `row-${Date.now()}`, drugName: "", rxcui: "", strength: "", doseForm: "", route: "", frequency: "", quantity: "30", refills: "0" }]);
   }
 
   function removeRow(uid: string) {
@@ -630,9 +729,12 @@ function MultiMedForm({
     else setPatientError("");
     if (!pharmacy.trim()) { setPharmacyError("Pharmacy is required."); ok = false; }
     else setPharmacyError("");
+    if (!startDate) { setStartDateError("Start date is required."); ok = false; }
+    else setStartDateError("");
     const re: Record<string, string> = {};
     rows.forEach((r) => {
       if (!r.drugName) { re[r.uid] = "Medication is required."; ok = false; }
+      else if (!r.frequency) { re[r.uid] = "Frequency is required."; ok = false; }
     });
     setRowErrors(re);
     return ok;
@@ -648,11 +750,17 @@ function MultiMedForm({
         submittedBy: user.uid,
         details: {
           type:  "multi_medication",
+          startDate: startDate || undefined,
+          indication: indicationCode ? { code: indicationCode, description: indicationDesc } : undefined,
           drugs: rows.map((r) => ({
-            drugName: r.drugName,
-            rxcui:    r.rxcui,
-            quantity: Number(r.quantity),
-            refills:  Number(r.refills),
+            drugName:  r.drugName,
+            rxcui:     r.rxcui,
+            strength:  r.strength || undefined,
+            doseForm:  r.doseForm || undefined,
+            route:     r.route || undefined,
+            frequency: r.frequency || undefined,
+            quantity:  Number(r.quantity),
+            refills:   Number(r.refills),
           })),
           pharmacy,
         },
@@ -664,6 +772,19 @@ function MultiMedForm({
       setSubmitting(false);
     }
   }
+
+  const inlineInputStyle: React.CSSProperties = {
+    width: "100%",
+    fontSize: 13,
+    color: T.text,
+    background: T.bgCard,
+    border: `1px solid ${T.border}`,
+    borderRadius: T.radiusSm,
+    padding: "10px 8px",
+    outline: "none",
+    fontFamily: T.font,
+    boxSizing: "border-box",
+  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 720 }}>
@@ -681,7 +802,28 @@ function MultiMedForm({
         error={patientError}
       />
 
-      {/* Drug rows */}
+      {/* Shared fields: Start Date + Indication */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+        <Input
+          label="Start Date"
+          required
+          type="date"
+          value={startDate}
+          onChange={(e) => { setStartDate(e.target.value); setStartDateError(""); }}
+          error={startDateError}
+        />
+        <div /> {/* spacer */}
+      </div>
+
+      <Icd10Search
+        code={indicationCode}
+        description={indicationDesc}
+        onSelect={(code, desc) => { setIndicationCode(code); setIndicationDesc(desc); }}
+        label="Indication (ICD-10)"
+        error=""
+      />
+
+      {/* Drug cards */}
       <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
           <label style={{ fontSize: 12, fontWeight: 600, color: T.textSub, textTransform: "uppercase", letterSpacing: 0.3 }}>
@@ -690,105 +832,113 @@ function MultiMedForm({
           <span style={{ fontSize: 12, color: T.textLight }}>{rows.length}/10</span>
         </div>
 
-        {/* Table header */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 90px 80px 32px",
-            gap: "0 10px",
-            padding: "7px 10px",
-            background: T.bgSub,
-            border: `1px solid ${T.border}`,
-            borderRadius: `${T.radiusSm} ${T.radiusSm} 0 0`,
-            borderBottom: "none",
-          }}
-        >
-          {["Medication", "Qty", "Refills", ""].map((h) => (
-            <span key={h} style={{ fontSize: 11, fontWeight: 600, color: T.textSub, textTransform: "uppercase", letterSpacing: 0.4 }}>
-              {h}
-            </span>
-          ))}
-        </div>
-
-        {rows.map((row, i) => (
+        {rows.map((row) => (
           <div
             key={row.uid}
             style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 90px 80px 32px",
-              gap: "0 10px",
-              alignItems: "start",
-              padding: "10px 10px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+              padding: 14,
               background: T.bgCard,
               border: `1px solid ${T.border}`,
-              borderTop: "none",
-              borderRadius: i === rows.length - 1 ? `0 0 ${T.radiusSm} ${T.radiusSm}` : 0,
+              borderRadius: T.radiusSm,
+              marginBottom: 10,
             }}
           >
-            <DrugSearch
-              value={row.drugName}
-              onSelect={(drug: Drug) => { updateRow(row.uid, "drugName", drug.name); updateRow(row.uid, "rxcui", drug.rxcui); }}
-              placeholder="Search medication…"
-              error={rowErrors[row.uid]}
-            />
-            <input
-              type="number"
-              min={1}
-              value={row.quantity}
-              onChange={(e) => updateRow(row.uid, "quantity", e.target.value)}
-              style={{
-                width: "100%",
-                fontSize: 13,
-                color: T.text,
-                background: T.bgCard,
-                border: `1px solid ${T.border}`,
-                borderRadius: T.radiusSm,
-                padding: "10px 8px",
-                outline: "none",
-                fontFamily: T.font,
-                boxSizing: "border-box",
-              }}
-            />
-            <input
-              type="number"
-              min={0}
-              max={12}
-              value={row.refills}
-              onChange={(e) => updateRow(row.uid, "refills", e.target.value)}
-              style={{
-                width: "100%",
-                fontSize: 13,
-                color: T.text,
-                background: T.bgCard,
-                border: `1px solid ${T.border}`,
-                borderRadius: T.radiusSm,
-                padding: "10px 8px",
-                outline: "none",
-                fontFamily: T.font,
-                boxSizing: "border-box",
-              }}
-            />
-            <button
-              onClick={() => removeRow(row.uid)}
-              disabled={rows.length <= 1}
-              title="Remove row"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: 28,
-                height: 28,
-                marginTop: 6,
-                borderRadius: T.radiusSm,
-                background: "none",
-                border: "none",
-                cursor: rows.length <= 1 ? "not-allowed" : "pointer",
-                color: rows.length <= 1 ? T.textLight : T.urgent,
-                transition: "color 0.1s",
-              }}
-            >
-              <Icon name="x" size={14} color={rows.length <= 1 ? T.textLight : T.urgent} />
-            </button>
+            {/* Row 1: Drug search + remove button */}
+            <div style={{ display: "flex", gap: 8, alignItems: "start" }}>
+              <div style={{ flex: 1 }}>
+                <DrugSearch
+                  value={row.drugName}
+                  onSelect={(drug: Drug) => {
+                    updateRow(row.uid, "drugName", drug.name);
+                    updateRow(row.uid, "rxcui", drug.rxcui);
+                    updateRow(row.uid, "strength", drug.strength || "");
+                    updateRow(row.uid, "doseForm", drug.doseForm || "");
+                    updateRow(row.uid, "route", drug.route || "");
+                  }}
+                  placeholder="Search medication…"
+                  error={rowErrors[row.uid]}
+                />
+              </div>
+              <button
+                onClick={() => removeRow(row.uid)}
+                disabled={rows.length <= 1}
+                title="Remove medication"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 28,
+                  height: 28,
+                  marginTop: 6,
+                  borderRadius: T.radiusSm,
+                  background: "none",
+                  border: "none",
+                  cursor: rows.length <= 1 ? "not-allowed" : "pointer",
+                  color: rows.length <= 1 ? T.textLight : T.urgent,
+                  transition: "color 0.1s",
+                }}
+              >
+                <Icon name="x" size={14} color={rows.length <= 1 ? T.textLight : T.urgent} />
+              </button>
+            </div>
+
+            {/* Row 2: Auto-filled chips (Strength | Form | Route) */}
+            {row.drugName && (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, padding: "6px 8px", background: T.bgSub, borderRadius: T.radiusSm }}>
+                <input
+                  placeholder="Strength"
+                  value={row.strength}
+                  onChange={(e) => updateRow(row.uid, "strength", e.target.value)}
+                  style={{ ...inlineInputStyle, fontSize: 12, padding: "6px 8px", background: T.bgSub, border: `1px solid ${T.borderLight}` }}
+                />
+                <input
+                  placeholder="Form"
+                  value={row.doseForm}
+                  onChange={(e) => updateRow(row.uid, "doseForm", e.target.value)}
+                  style={{ ...inlineInputStyle, fontSize: 12, padding: "6px 8px", background: T.bgSub, border: `1px solid ${T.borderLight}` }}
+                />
+                <input
+                  placeholder="Route"
+                  value={row.route}
+                  onChange={(e) => updateRow(row.uid, "route", e.target.value)}
+                  style={{ ...inlineInputStyle, fontSize: 12, padding: "6px 8px", background: T.bgSub, border: `1px solid ${T.borderLight}` }}
+                />
+              </div>
+            )}
+
+            {/* Row 3: Frequency + Qty + Refills */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 80px 80px", gap: 8 }}>
+              <select
+                value={row.frequency}
+                onChange={(e) => updateRow(row.uid, "frequency", e.target.value)}
+                style={{ ...inlineInputStyle, cursor: "pointer" }}
+              >
+                <option value="">Frequency…</option>
+                {FREQUENCY_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+              <input
+                type="number"
+                min={1}
+                value={row.quantity}
+                onChange={(e) => updateRow(row.uid, "quantity", e.target.value)}
+                placeholder="Qty"
+                style={inlineInputStyle}
+              />
+              <input
+                type="number"
+                min={0}
+                max={12}
+                value={row.refills}
+                onChange={(e) => updateRow(row.uid, "refills", e.target.value)}
+                placeholder="Refills"
+                style={inlineInputStyle}
+              />
+            </div>
           </div>
         ))}
 
@@ -800,7 +950,7 @@ function MultiMedForm({
               alignItems: "center",
               gap: 6,
               padding: "9px 12px",
-              marginTop: 8,
+              marginTop: 2,
               background: "none",
               border: `1px dashed ${T.border}`,
               borderRadius: T.radiusSm,

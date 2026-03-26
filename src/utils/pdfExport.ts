@@ -2,6 +2,7 @@ import jsPDF from "jspdf";
 import type { Request, Patient, Staff } from "../types";
 import { fmtDateTime, fmtShortDate, calcAge } from "./formatting";
 import { reqTitle } from "./statusHelpers";
+import { frequencyLabel } from "../data/frequencyOptions";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -215,9 +216,35 @@ export function exportRequestPdf(
     labelValue(doc, y, "Pharmacy", details.pharmacy, { colOffset: col2 });
     y += 11;
 
+    if (details.strength || details.doseForm || details.route) {
+      const parts = [
+        details.strength ? `Strength: ${details.strength}` : "",
+        details.doseForm ? `Form: ${details.doseForm}` : "",
+        details.route ? `Route: ${details.route}` : "",
+      ].filter(Boolean);
+      labelValue(doc, y, "Drug Details", parts.join("  ·  "));
+      y += 11;
+    }
+
     labelValue(doc, y, "Quantity", `${details.quantity} units`);
     labelValue(doc, y, "Refills", details.refills.toString(), { colOffset: col2 });
     y += 11;
+
+    if (details.frequency) {
+      labelValue(doc, y, "Frequency", frequencyLabel(details.frequency));
+      if (details.startDate) {
+        labelValue(doc, y, "Start Date", details.startDate, { colOffset: col2 });
+      }
+      y += 11;
+    } else if (details.startDate) {
+      labelValue(doc, y, "Start Date", details.startDate);
+      y += 11;
+    }
+
+    if (details.indication) {
+      labelValue(doc, y, "Indication", `${details.indication.code}  ·  ${details.indication.description}`);
+      y += 11;
+    }
 
     if (details.justification) {
       y += 2;
@@ -229,18 +256,29 @@ export function exportRequestPdf(
     y = sectionHeading(doc, y, "Multi-Medication Batch Details");
 
     labelValue(doc, y, "Pharmacy", details.pharmacy);
+    if (details.startDate) {
+      labelValue(doc, y, "Start Date", details.startDate, { colOffset: col2 });
+    }
     y += 11;
 
-    // Drug table header
+    if (details.indication) {
+      labelValue(doc, y, "Indication", `${details.indication.code}  ·  ${details.indication.description}`);
+      y += 11;
+    }
+
+    // Drug table header — 6 columns
     doc.setFillColor(239, 235, 228); // bgSub
     doc.rect(MARGIN, y - 2, CONTENT_W, 7, "F");
     doc.setFont("helvetica", "bold");
     doc.setFontSize(7);
     doc.setTextColor(122, 116, 108);
-    const col = [0, CONTENT_W * 0.55, CONTENT_W * 0.75];
+    const col = [0, CONTENT_W * 0.35, CONTENT_W * 0.50, CONTENT_W * 0.62, CONTENT_W * 0.76, CONTENT_W * 0.88];
     doc.text("MEDICATION", MARGIN + col[0] + 2, y + 2.5);
-    doc.text("QTY", MARGIN + col[1], y + 2.5);
-    doc.text("REFILLS", MARGIN + col[2], y + 2.5);
+    doc.text("FREQ", MARGIN + col[1], y + 2.5);
+    doc.text("STRENGTH", MARGIN + col[2], y + 2.5);
+    doc.text("FORM", MARGIN + col[3], y + 2.5);
+    doc.text("QTY", MARGIN + col[4], y + 2.5);
+    doc.text("REFILLS", MARGIN + col[5], y + 2.5);
     y += 7;
 
     details.drugs.forEach((d, i) => {
@@ -249,11 +287,14 @@ export function exportRequestPdf(
         doc.rect(MARGIN, y - 2, CONTENT_W, 7, "F");
       }
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(8.5);
+      doc.setFontSize(7.5);
       doc.setTextColor(44, 40, 37);
-      doc.text(`${d.drugName}  ·  RxCUI ${d.rxcui}`, MARGIN + col[0] + 2, y + 2.5);
-      doc.text(d.quantity.toString(), MARGIN + col[1], y + 2.5);
-      doc.text(d.refills.toString(), MARGIN + col[2], y + 2.5);
+      doc.text(d.drugName, MARGIN + col[0] + 2, y + 2.5);
+      doc.text(d.frequency ? frequencyLabel(d.frequency).split(" — ")[0] : "—", MARGIN + col[1], y + 2.5);
+      doc.text(d.strength || "—", MARGIN + col[2], y + 2.5);
+      doc.text(d.doseForm || "—", MARGIN + col[3], y + 2.5);
+      doc.text(d.quantity.toString(), MARGIN + col[4], y + 2.5);
+      doc.text(d.refills.toString(), MARGIN + col[5], y + 2.5);
       y += 7;
     });
 

@@ -2,6 +2,35 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { T } from "../tokens";
 import type { Drug } from "../types";
 
+interface RxTermsResponse {
+  rxtermsProperties?: {
+    strength?: string;
+    rxtermsDoseForm?: string;
+    route?: string;
+  };
+}
+
+async function enrichDrug(drug: Drug): Promise<Drug> {
+  if (!drug.rxcui) return drug;
+  try {
+    const url = `https://rxnav.nlm.nih.gov/REST/RxTerms/rxcui/${encodeURIComponent(drug.rxcui)}/allinfo.json`;
+    const res = await fetch(url);
+    const data = (await res.json()) as RxTermsResponse;
+    const props = data.rxtermsProperties;
+    if (props) {
+      return {
+        ...drug,
+        strength: props.strength || undefined,
+        doseForm: props.rxtermsDoseForm || undefined,
+        route: props.route || undefined,
+      };
+    }
+  } catch {
+    // Enrichment failed — return without enrichment, user fills manually
+  }
+  return drug;
+}
+
 interface DrugSearchProps {
   value: string;
   onSelect: (drug: Drug) => void;
@@ -26,6 +55,7 @@ export default function DrugSearch({
   const [activeIdx, setActiveIdx] = useState(-1);
   const [focused, setFocused] = useState(false);
   const [noResults, setNoResults] = useState(false);
+  const [enriching, setEnriching] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -71,11 +101,18 @@ export default function DrugSearch({
     timerRef.current = setTimeout(() => search(val), 320);
   }
 
-  function pick(drug: Drug) {
+  async function pick(drug: Drug) {
     setQuery(drug.name);
     setOpen(false);
     setActiveIdx(-1);
-    onSelect(drug);
+    if (drug.rxcui) {
+      setEnriching(true);
+      const enriched = await enrichDrug(drug);
+      setEnriching(false);
+      onSelect(enriched);
+    } else {
+      onSelect(drug);
+    }
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -141,7 +178,7 @@ export default function DrugSearch({
             boxSizing: "border-box",
           }}
         />
-        {loading && (
+        {(loading || enriching) && (
           <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)" }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={T.textLight} strokeWidth="2.5" strokeLinecap="round">
               <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83">

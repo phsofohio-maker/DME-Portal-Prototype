@@ -60,6 +60,14 @@ export interface DMEItem {
 export interface Drug {
   name: string;
   rxcui: string;
+  strength?: string;
+  doseForm?: string;
+  route?: string;
+}
+
+export interface Indication {
+  code: string;
+  description: string;
 }
 
 // ─── Request detail shapes ────────────────────────────────────────────────────
@@ -78,6 +86,12 @@ export interface MedicationDetails {
   type: "medication";
   drugName: string;
   rxcui: string;
+  strength?: string;
+  doseForm?: string;
+  route?: string;
+  frequency?: string;
+  startDate?: string;
+  indication?: Indication;
   quantity: number;
   refills: number;
   pharmacy: string;
@@ -86,9 +100,15 @@ export interface MedicationDetails {
 
 export interface MultiMedicationDetails {
   type: "multi_medication";
+  startDate?: string;
+  indication?: Indication;
   drugs: Array<{
     drugName: string;
     rxcui: string;
+    strength?: string;
+    doseForm?: string;
+    route?: string;
+    frequency?: string;
     quantity: number;
     refills: number;
   }>;

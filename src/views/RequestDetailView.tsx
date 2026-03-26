@@ -11,6 +11,7 @@ import Icon from "../components/Icon";
 import { fmtDateTime, fmtShortDate } from "../utils/formatting";
 import { reqTitle } from "../utils/statusHelpers";
 import { exportRequestPdf } from "../utils/pdfExport";
+import { frequencyLabel } from "../data/frequencyOptions";
 import type { Staff, Request, Patient, RequestStatus, HistoryEntry } from "../types";
 
 // ─── History helpers ──────────────────────────────────────────────────────────
@@ -297,24 +298,51 @@ export default function RequestDetailView({
         )}
 
         {details.type === "medication" && (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-            <InfoRow
-              label="Medication"
-              value={
-                <span>
-                  {details.drugName}
-                  <span style={{ fontSize: 12, color: T.textLight, marginLeft: 6 }}>RxCUI {details.rxcui}</span>
-                </span>
-              }
-            />
-            <InfoRow label="Pharmacy"  value={details.pharmacy} />
-            <InfoRow label="Quantity"  value={`${details.quantity} units`} />
-            <InfoRow label="Refills"   value={details.refills.toString()} />
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              <InfoRow
+                label="Medication"
+                value={
+                  <span>
+                    {details.drugName}
+                    <span style={{ fontSize: 12, color: T.textLight, marginLeft: 6 }}>RxCUI {details.rxcui}</span>
+                  </span>
+                }
+              />
+              <InfoRow label="Pharmacy" value={details.pharmacy} />
+            </div>
+            {(details.strength || details.doseForm || details.route) && (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+                {details.strength && <InfoRow label="Strength" value={details.strength} />}
+                {details.doseForm && <InfoRow label="Dose Form" value={details.doseForm} />}
+                {details.route && <InfoRow label="Route" value={details.route} />}
+              </div>
+            )}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+              {details.frequency && <InfoRow label="Frequency" value={frequencyLabel(details.frequency)} />}
+              <InfoRow label="Quantity" value={`${details.quantity} units`} />
+              <InfoRow label="Refills" value={details.refills.toString()} />
+            </div>
+            {details.startDate && (
+              <InfoRow label="Start Date" value={details.startDate} />
+            )}
+            {details.indication && (
+              <InfoRow
+                label="Indication"
+                value={
+                  <span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: T.info, background: T.infoLight, padding: "2px 6px", borderRadius: 4, marginRight: 8 }}>
+                      {details.indication.code}
+                    </span>
+                    {details.indication.description}
+                  </span>
+                }
+              />
+            )}
             {details.justification && (
               <InfoRow
                 label="Notes"
                 value={<p style={{ lineHeight: 1.65 }}>{details.justification}</p>}
-                style={{ gridColumn: "1 / -1" }}
               />
             )}
           </div>
@@ -322,12 +350,31 @@ export default function RequestDetailView({
 
         {details.type === "multi_medication" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {/* Shared fields */}
+            {(details.startDate || details.indication) && (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                {details.startDate && <InfoRow label="Start Date" value={details.startDate} />}
+                {details.indication && (
+                  <InfoRow
+                    label="Indication"
+                    value={
+                      <span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: T.info, background: T.infoLight, padding: "2px 6px", borderRadius: 4, marginRight: 8 }}>
+                          {details.indication.code}
+                        </span>
+                        {details.indication.description}
+                      </span>
+                    }
+                  />
+                )}
+              </div>
+            )}
             {/* Drug table */}
             <div>
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "1fr 90px 80px",
+                  gridTemplateColumns: "1fr 100px 70px 70px 60px 60px",
                   gap: "0 12px",
                   padding: "7px 10px",
                   background: T.bgSub,
@@ -335,7 +382,7 @@ export default function RequestDetailView({
                   borderBottom: `1px solid ${T.border}`,
                 }}
               >
-                {["Medication", "Quantity", "Refills"].map((h) => (
+                {["Medication", "Freq", "Strength", "Form", "Qty", "Refills"].map((h) => (
                   <span key={h} style={{ fontSize: 11, fontWeight: 600, color: T.textSub, textTransform: "uppercase", letterSpacing: 0.4 }}>
                     {h}
                   </span>
@@ -346,7 +393,7 @@ export default function RequestDetailView({
                   key={i}
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "1fr 90px 80px",
+                    gridTemplateColumns: "1fr 100px 70px 70px 60px 60px",
                     gap: "0 12px",
                     padding: "10px 10px",
                     borderBottom: i < details.drugs.length - 1 ? `1px solid ${T.borderLight}` : undefined,
@@ -362,6 +409,9 @@ export default function RequestDetailView({
                     <span style={{ fontSize: 14, color: T.text }}>{d.drugName}</span>
                     <span style={{ fontSize: 11, color: T.textLight, marginLeft: 6 }}>RxCUI {d.rxcui}</span>
                   </div>
+                  <span style={{ fontSize: 13, color: T.text }}>{d.frequency ? frequencyLabel(d.frequency) : "—"}</span>
+                  <span style={{ fontSize: 13, color: T.text }}>{d.strength || "—"}</span>
+                  <span style={{ fontSize: 13, color: T.text }}>{d.doseForm || "—"}</span>
                   <span style={{ fontSize: 14, color: T.text }}>{d.quantity}</span>
                   <span style={{ fontSize: 14, color: T.text }}>{d.refills}</span>
                 </div>

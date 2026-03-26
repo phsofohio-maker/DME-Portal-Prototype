@@ -33,10 +33,12 @@ export const REQUESTS: Request[] = [
     status: "rmi",
     details: {
       type: "multi_medication",
+      startDate: "2026-03-14",
+      indication: { code: "I48.91", description: "Unspecified atrial fibrillation" },
       drugs: [
-        { drugName: "Warfarin 5mg",    rxcui: "855333", quantity: 30, refills: 3 },
-        { drugName: "Metformin 500mg", rxcui: "861007", quantity: 60, refills: 2 },
-        { drugName: "Sertraline 50mg", rxcui: "312940", quantity: 30, refills: 5 },
+        { drugName: "Warfarin 5mg",    rxcui: "855333", strength: "5 MG", doseForm: "Tab", route: "Oral", frequency: "QD",  quantity: 30, refills: 3 },
+        { drugName: "Metformin 500mg", rxcui: "861007", strength: "500 MG", doseForm: "Tab", route: "Oral", frequency: "BID", quantity: 60, refills: 2 },
+        { drugName: "Sertraline 50mg", rxcui: "312940", strength: "50 MG", doseForm: "Tab", route: "Oral", frequency: "QD",  quantity: 30, refills: 5 },
       ],
       pharmacy: "Kroger Pharmacy — Lancaster",
       justification: "Monthly refill for patient's established medication regimen. All medications are active on the current treatment plan.",
@@ -64,6 +66,9 @@ export const REQUESTS: Request[] = [
     status: "approved",
     details: {
       type: "medication", drugName: "Furosemide 40mg", rxcui: "310430",
+      strength: "40 MG", doseForm: "Tab", route: "Oral", frequency: "QD",
+      startDate: "2026-03-12",
+      indication: { code: "I50.32", description: "Chronic diastolic (congestive) heart failure" },
       quantity: 30, refills: 2, pharmacy: "CVS Pharmacy — Gahanna",
       justification: "Patient showing signs of fluid retention — +4 lbs over 48 hours. Physician ordered dose increase from 20mg to 40mg. Refill authorization needed.",
     },
@@ -90,11 +95,13 @@ export const REQUESTS: Request[] = [
     status: "approved",
     details: {
       type: "multi_medication",
+      startDate: "2026-03-10",
+      indication: { code: "I10", description: "Essential (primary) hypertension" },
       drugs: [
-        { drugName: "Lisinopril 10mg",   rxcui: "314077", quantity: 30, refills: 3 },
-        { drugName: "Atorvastatin 40mg", rxcui: "617312", quantity: 30, refills: 3 },
-        { drugName: "Metformin 1000mg",  rxcui: "861008", quantity: 60, refills: 2 },
-        { drugName: "Furosemide 20mg",   rxcui: "310429", quantity: 30, refills: 1 },
+        { drugName: "Lisinopril 10mg",   rxcui: "314077", strength: "10 MG", doseForm: "Tab", route: "Oral", frequency: "QD",  quantity: 30, refills: 3 },
+        { drugName: "Atorvastatin 40mg", rxcui: "617312", strength: "40 MG", doseForm: "Tab", route: "Oral", frequency: "QHS", quantity: 30, refills: 3 },
+        { drugName: "Metformin 1000mg",  rxcui: "861008", strength: "1000 MG", doseForm: "Tab", route: "Oral", frequency: "BID", quantity: 60, refills: 2 },
+        { drugName: "Furosemide 20mg",   rxcui: "310429", strength: "20 MG", doseForm: "Tab", route: "Oral", frequency: "QD",  quantity: 30, refills: 1 },
       ],
       pharmacy: "Walgreens — Broad St Columbus",
     },
@@ -108,6 +115,9 @@ export const REQUESTS: Request[] = [
     status: "pending",
     details: {
       type: "medication", drugName: "Gabapentin 300mg", rxcui: "310431",
+      strength: "300 MG", doseForm: "Cap", route: "Oral", frequency: "TID",
+      startDate: "2026-03-09",
+      indication: { code: "G35", description: "Multiple sclerosis" },
       quantity: 90, refills: 1, pharmacy: "Rite Aid — Springfield",
       justification: "Gabapentin prescribed for neuropathic pain associated with MS. Patient reports significant pain interference with sleep and daily function.",
     },
