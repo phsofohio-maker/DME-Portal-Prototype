@@ -3,9 +3,10 @@
  *
  * Functions:
  *   logAuthEvent          — callable: writes auth actions to audit_log
- *   notifyNewRequest      — Firestore trigger: emails admins when a request is created
- *   notifyRequestStatus   — Firestore trigger: emails submitter on approved/denied/rmi
- *   notifyNewMessage      — Firestore trigger: emails recipient on new message
+ *   onNewRequest          — Firestore trigger: emails admins when a request is created
+ *   onRequestStatusChange — Firestore trigger: emails submitter on approved/denied/rmi
+ *   onNewMessage          — Firestore trigger: emails recipient on new message
+ *   onNewInvitation       — Firestore trigger: emails invitee with branded invite + password link
  *
  * Email delivery: writes to `mail` collection; Firebase "Trigger Email from Firestore"
  * extension handles SMTP delivery via notifications@harmonyhca.org.
@@ -13,6 +14,7 @@
  */
 
 import {initializeApp} from "firebase-admin/app";
+import {getAuth} from "firebase-admin/auth";
 import {getFirestore, FieldValue} from "firebase-admin/firestore";
 import {setGlobalOptions} from "firebase-functions";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
@@ -79,9 +81,9 @@ export const logAuthEvent = onCall(async (request) => {
   });
 });
 
-// ─── notifyNewRequest ─────────────────────────────────────────────────────────
+// ─── onNewRequest ────────────────────────────────────────────────────────────
 
-export const notifyNewRequest = onDocumentCreated(
+export const onNewRequest = onDocumentCreated(
   "requests/{requestId}",
   async (event) => {
     const data = event.data?.data();
@@ -122,9 +124,9 @@ export const notifyNewRequest = onDocumentCreated(
   }
 );
 
-// ─── notifyRequestStatus ──────────────────────────────────────────────────────
+// ─── onRequestStatusChange ────────────────────────────────────────────────────
 
-export const notifyRequestStatus = onDocumentUpdated(
+export const onRequestStatusChange = onDocumentUpdated(
   "requests/{requestId}",
   async (event) => {
     const before = event.data?.before.data();
@@ -189,9 +191,9 @@ export const notifyRequestStatus = onDocumentUpdated(
   }
 );
 
-// ─── notifyNewMessage ─────────────────────────────────────────────────────────
+// ─── onNewMessage ────────────────────────────────────────────────────────────
 
-export const notifyNewMessage = onDocumentCreated(
+export const onNewMessage = onDocumentCreated(
   "communications/{messageId}",
   async (event) => {
     const data = event.data?.data();
@@ -227,5 +229,82 @@ export const notifyNewMessage = onDocumentCreated(
       to: recipient.email,
       message: {subject, html},
     });
+  }
+);
+
+// ─── onNewInvitation ─────────────────────────────────────────────────────────
+
+const ROLE_LABELS: Record<string, string> = {
+  admin: "Admin",
+  nurse: "Nurse",
+  homemaker: "Homemaker",
+  office_staff: "Office Staff",
+};
+
+export const onNewInvitation = onDocumentCreated(
+  "invitations/{inviteId}",
+  async (event) => {
+    const data = event.data?.data();
+    if (!data) return;
+    if (data.status !== "pending") return;
+
+    const email: string = data.email;
+    const rawRole: string = data.role;
+    const roleLabel: string = ROLE_LABELS[rawRole] ?? rawRole;
+    const invitedByName: string = data.invitedByName ?? "An administrator";
+
+    // 1. Create Firebase Auth account (or find existing one)
+    let uid: string;
+    try {
+      const userRecord = await getAuth().createUser({
+        email,
+        password: crypto.randomUUID(),
+      });
+      uid = userRecord.uid;
+    } catch (err: unknown) {
+      if ((err as {code?: string}).code === "auth/email-already-exists") {
+        const existing = await getAuth().getUserByEmail(email);
+        uid = existing.uid;
+      } else {
+        throw err;
+      }
+    }
+
+    // 2. Create staff document
+    const now = Date.now();
+    await db.collection("staff").doc(uid).set({
+      email,
+      role: rawRole,
+      displayName: email.split("@")[0],
+      hasCompletedOnboarding: false,
+      status: "active",
+      createdAt: now,
+      updatedAt: now,
+      notificationPrefs: {emailOnStatusChange: true, emailOnNewMessage: true},
+    });
+
+    // 3. Generate password-reset link and send branded invitation email
+    const resetLink = await getAuth().generatePasswordResetLink(email);
+
+    const subject = "You've been invited to the Parrish Health DME Portal";
+    const html = emailWrapper(`
+      <h2 style="font-size:18px;margin-bottom:8px;">You're Invited</h2>
+      <p><strong>${invitedByName}</strong> has invited you to join the
+         Parrish Health DME Portal as a <strong>${roleLabel}</strong>.</p>
+      <p>Click the button below to set your password and get started.</p>
+      <p style="margin-top:16px;">
+        <a href="${resetLink}" style="background:#5B7A5E;color:#fff;padding:10px 18px;
+           border-radius:6px;text-decoration:none;font-weight:bold;">
+          Set Your Password
+        </a>
+      </p>
+      <p style="color:#999;font-size:12px;margin-top:16px;">
+        This link expires in 1 hour. If it has expired, ask your administrator
+        to resend the invitation.
+      </p>
+      ${emailFooter()}
+    `);
+
+    await db.collection("mail").add({to: email, message: {subject, html}});
   }
 );

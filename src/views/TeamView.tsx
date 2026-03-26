@@ -63,8 +63,10 @@ export default function TeamView({
       setInviteEmail("");
       setInviteRole("");
       setTimeout(() => setInviteSent(""), 4000);
-    } catch {
-      setInviteError("Failed to send invitation. Please try again.");
+    } catch (err: unknown) {
+      console.error("Invite error:", err);
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      setInviteError(`Failed to send invitation: ${msg}`);
     } finally {
       setInviting(false);
     }

@@ -16,8 +16,6 @@
 import {
   signInWithEmailAndPassword,
   signOut,
-  sendPasswordResetEmail,
-  createUserWithEmailAndPassword,
 } from 'firebase/auth';
 import {
   collection,
@@ -162,32 +160,14 @@ export const firebaseService = {
   },
 
   sendInvite: async (email: string, role: UserRole, admin: Staff): Promise<void> => {
-    const tempPassword = crypto.randomUUID();
-    const credential   = await createUserWithEmailAndPassword(auth, email, tempPassword);
-    const newUid       = credential.user.uid;
-    const now          = Date.now();
-
-    await setDoc(doc(db, 'staff', newUid), {
-      email,
-      role,
-      displayName:            email.split('@')[0],
-      hasCompletedOnboarding: false,
-      status:                 'active',
-      createdAt:              now,
-      updatedAt:              now,
-      notificationPrefs:      { emailOnStatusChange: true, emailOnNewMessage: true },
-    });
-
     await addDoc(collection(db, 'invitations'), {
       email,
       role,
       invitedBy:     admin.uid,
       invitedByName: admin.displayName,
-      createdAt:     now,
+      createdAt:     Date.now(),
       status:        'pending',
     });
-
-    await sendPasswordResetEmail(auth, email);
   },
 
   revokeInvite: async (id: string): Promise<void> => {
