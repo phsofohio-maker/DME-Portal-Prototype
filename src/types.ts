@@ -159,6 +159,7 @@ export interface Communication {
   iv?: string;          // present when message is AES-GCM encrypted
   read: boolean;
   createdAt: number;
+  ephemeral?: boolean;  // if true, auto-deleted at end of day
 }
 
 // ─── Invitations ─────────────────────────────────────────────────────────────

@@ -19,6 +19,7 @@ import {getFirestore, FieldValue} from "firebase-admin/firestore";
 import {setGlobalOptions} from "firebase-functions";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
 import {onDocumentCreated, onDocumentUpdated} from "firebase-functions/v2/firestore";
+import {onSchedule} from "firebase-functions/v2/scheduler";
 
 initializeApp();
 const db = getFirestore();
@@ -306,5 +307,78 @@ export const onNewInvitation = onDocumentCreated(
     `);
 
     await db.collection("mail").add({to: email, message: {subject, html}});
+  }
+);
+
+// ─── cleanupEphemeralMessages ────────────────────────────────────────────────
+
+export const cleanupEphemeralMessages = onSchedule(
+  {schedule: "every day 00:00", timeZone: "America/New_York"},
+  async () => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const cutoff = now.getTime();
+
+    const snap = await db.collection("communications")
+      .where("ephemeral", "==", true)
+      .where("createdAt", "<", cutoff)
+      .get();
+
+    if (snap.empty) {
+      console.log("No ephemeral messages to clean up.");
+      return;
+    }
+
+    let batch = db.batch();
+    let count = 0;
+    for (const doc of snap.docs) {
+      batch.delete(doc.ref);
+      count++;
+      if (count % 500 === 0) {
+        await batch.commit();
+        batch = db.batch();
+      }
+    }
+    if (count % 500 !== 0) await batch.commit();
+
+    console.log(`Cleaned up ${count} ephemeral messages.`);
+  }
+);
+
+// ─── onStaffOnboarded ────────────────────────────────────────────────────────
+
+export const onStaffOnboarded = onDocumentUpdated(
+  "staff/{staffId}",
+  async (event) => {
+    const before = event.data?.before.data();
+    const after = event.data?.after.data();
+    if (!before || !after) return;
+
+    // Only fire when onboarding transitions false → true
+    if (before.hasCompletedOnboarding || !after.hasCompletedOnboarding) return;
+
+    const email: string = after.email;
+    if (!email) return;
+
+    // Find matching pending invitation(s) by email
+    const invSnap = await db.collection("invitations")
+      .where("email", "==", email)
+      .where("status", "==", "pending")
+      .get();
+
+    if (invSnap.empty) return;
+
+    const batch = db.batch();
+    for (const inv of invSnap.docs) {
+      batch.update(inv.ref, {
+        status: "accepted",
+        acceptedAt: Date.now(),
+      });
+    }
+    await batch.commit();
+
+    console.log(
+      `Marked ${invSnap.size} invitation(s) as accepted for ${email}`
+    );
   }
 );

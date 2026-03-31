@@ -77,8 +77,16 @@ function getConversationId(uid1: string, uid2: string): string {
 async function getOrCreateConversationKey(uid1: string, uid2: string): Promise<string> {
   const convId = getConversationId(uid1, uid2);
   const keyRef = doc(db, 'conversationKeys', convId);
-  const snap   = await getDoc(keyRef);
-  if (snap.exists()) return snap.data().key as string;
+
+  // Try to read existing key. Firestore Security Rules deny reads on
+  // non-existent docs (resource.data is null → rule evaluates false),
+  // so a PERMISSION_DENIED here means the key doesn't exist yet.
+  try {
+    const snap = await getDoc(keyRef);
+    if (snap.exists()) return snap.data().key as string;
+  } catch {
+    // Key document doesn't exist — fall through to create it
+  }
 
   const key = await generateConversationKey();
   await setDoc(keyRef, { participants: [uid1, uid2].sort(), key });
@@ -316,6 +324,7 @@ export const firebaseService = {
     await retryWithBackoff(
       () => addDoc(collection(db, 'communications'), {
         ...message, messageBody: ciphertext, iv, read: false, createdAt: Date.now(),
+        ephemeral: message.ephemeral ?? false,
       }),
       'sendMessage'
     );

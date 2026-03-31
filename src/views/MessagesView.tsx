@@ -149,7 +149,15 @@ function MessageBubble({
         >
           {message.messageBody}
         </div>
-        <span style={{ fontSize: 11, color: T.textLight }}>{timeAgo(message.createdAt)}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ fontSize: 11, color: T.textLight }}>{timeAgo(message.createdAt)}</span>
+          {message.ephemeral && (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 10, color: T.warn }}>
+              <Icon name="clock" size={10} color={T.warn} />
+              Disappears at end of day
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -180,7 +188,8 @@ function ReplyInput({
         messageBody: body.trim(),
       });
       setBody("");
-    } catch {
+    } catch (err) {
+      console.error("Message reply failed:", err);
       setError("Failed to send. Please try again.");
     } finally {
       setSending(false);
@@ -277,7 +286,8 @@ function ComposeForm({
       });
       onSent(recipientId);
       onClose();
-    } catch {
+    } catch (err) {
+      console.error("Message send failed:", err);
       setSendError("Failed to send. Please try again.");
     } finally {
       setSending(false);
