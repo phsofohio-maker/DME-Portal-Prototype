@@ -12,6 +12,7 @@ import { typeInfo } from "../utils/statusHelpers";
 import { DME_CATALOG } from "../data/dmeCatalog";
 import { firebaseService } from "../services/firebaseService";
 import { FREQUENCY_OPTIONS } from "../data/frequencyOptions";
+import { dmeFormSchema, medicationFormSchema, multiMedicationFormSchema, drugRowSchema, fieldErrors } from "../lib/schemas";
 import type { Staff, Patient, RequestType, Drug } from "../types";
 
 function todayISO(): string {
@@ -306,14 +307,10 @@ function DmeForm({
   }
 
   function validate(): boolean {
-    const e: Partial<DmeFormValues> = {};
-    if (!vals.patientId)     e.patientId     = "Patient is required.";
-    if (!vals.equipmentId)   e.equipmentId   = "Equipment is required.";
-    if (!vals.icd10Code)     e.icd10Code     = "ICD-10 code is required.";
-    if (!vals.urgency)       e.urgency       = "Urgency is required.";
-    if (!vals.justification.trim()) e.justification = "Clinical justification is required.";
-    setErrors(e);
-    return Object.keys(e).length === 0;
+    const result = dmeFormSchema.safeParse(vals);
+    if (result.success) { setErrors({}); return true; }
+    setErrors(fieldErrors(result) as Partial<DmeFormValues>);
+    return false;
   }
 
   async function handleSubmit() {
@@ -482,15 +479,10 @@ function MedicationForm({
   }
 
   function validate(): boolean {
-    const e: Partial<MedFormValues> = {};
-    if (!vals.patientId) e.patientId = "Patient is required.";
-    if (!vals.drugName)  e.drugName  = "Medication is required.";
-    if (!vals.quantity || Number(vals.quantity) < 1) e.quantity = "Quantity must be at least 1.";
-    if (!vals.pharmacy.trim()) e.pharmacy = "Pharmacy is required.";
-    if (!vals.frequency) e.frequency = "Frequency is required.";
-    if (!vals.startDate) e.startDate = "Start date is required.";
-    setErrors(e);
-    return Object.keys(e).length === 0;
+    const result = medicationFormSchema.safeParse(vals);
+    if (result.success) { setErrors({}); return true; }
+    setErrors(fieldErrors(result) as Partial<MedFormValues>);
+    return false;
   }
 
   async function handleSubmit() {
@@ -738,15 +730,47 @@ function MultiMedForm({
 
   function validate(): boolean {
     let ok = true;
-    if (!patientId) { setPatientError("Patient is required."); ok = false; }
+
+    // Validate top-level fields via Zod
+    const topResult = multiMedicationFormSchema.safeParse({
+      patientId,
+      startDate,
+      indicationCode: indicationCode || undefined,
+      indicationDesc: indicationDesc || undefined,
+      drugs: rows.map((r) => ({
+        drugName: r.drugName, rxcui: r.rxcui, strength: r.strength || undefined,
+        doseForm: r.doseForm || undefined, route: r.route || undefined,
+        frequency: r.frequency, quantity: Number(r.quantity), refills: Number(r.refills),
+      })),
+      pharmacy,
+    });
+    const errs = topResult.success ? {} : fieldErrors(topResult);
+
+    if (errs.patientId) { setPatientError(errs.patientId); ok = false; }
     else setPatientError("");
-    if (!pharmacy.trim()) { setPharmacyError("Pharmacy is required."); ok = false; }
+    if (errs.pharmacy) { setPharmacyError(errs.pharmacy); ok = false; }
     else setPharmacyError("");
-    if (!startDate) { setStartDateError("Start date is required."); ok = false; }
+    if (errs.startDate) { setStartDateError(errs.startDate); ok = false; }
     else setStartDateError("");
+
+    // Per-row validation
     const re: Record<string, string> = {};
-    rows.forEach((r) => {
-      if (!r.drugName) { re[r.uid] = "Medication is required."; ok = false; }
+    rows.forEach((r, i) => {
+      const rowResult = drugRowSchema.safeParse({
+        drugName: r.drugName, rxcui: r.rxcui, strength: r.strength || undefined,
+        doseForm: r.doseForm || undefined, route: r.route || undefined,
+        frequency: r.frequency, quantity: Number(r.quantity), refills: Number(r.refills),
+      });
+      if (!rowResult.success) {
+        const rowErrs = fieldErrors(rowResult);
+        re[r.uid] = rowErrs.drugName || rowErrs.frequency || rowErrs.quantity || "Invalid entry.";
+        ok = false;
+      }
+    });
+    // Also pick up any Zod errors on individual drugs items
+    rows.forEach((r, i) => {
+      const drugErr = errs[`drugs.${i}.drugName`] || errs[`drugs.${i}.frequency`];
+      if (drugErr && !re[r.uid]) { re[r.uid] = drugErr; ok = false; }
       else if (!r.frequency) { re[r.uid] = "Frequency is required."; ok = false; }
     });
     setRowErrors(re);

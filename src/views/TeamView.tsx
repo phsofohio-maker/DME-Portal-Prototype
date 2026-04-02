@@ -9,6 +9,8 @@ import Icon from "../components/Icon";
 import { getInitials, timeAgo } from "../utils/formatting";
 import { roleLabel } from "../utils/statusHelpers";
 import { firebaseService } from "../services/firebaseService";
+import { logger } from "../services/logger";
+import { staffInviteSchema } from "../lib/schemas";
 import type { Staff, UserRole, UserInvitation } from "../types";
 
 const ROLE_COLORS: Record<string, string> = {
@@ -50,11 +52,15 @@ export default function TeamView({
   const isAdmin = user.role === "admin";
 
   async function handleInvite() {
-    const eErr = !inviteEmail.trim() ? "Email address is required." : "";
-    const rErr = !inviteRole ? "Please select a role." : "";
-    setEmailError(eErr);
-    setRoleError(rErr);
-    if (eErr || rErr) return;
+    const parsed = staffInviteSchema.safeParse({ email: inviteEmail.trim(), role: inviteRole || undefined });
+    if (!parsed.success) {
+      const issues = parsed.error.issues;
+      setEmailError(issues.find((i) => i.path[0] === "email")?.message ?? "");
+      setRoleError(issues.find((i) => i.path[0] === "role")?.message ?? "");
+      return;
+    }
+    setEmailError("");
+    setRoleError("");
     setInviting(true);
     setInviteError("");
     try {
@@ -64,7 +70,7 @@ export default function TeamView({
       setInviteRole("");
       setTimeout(() => setInviteSent(""), 4000);
     } catch (err: unknown) {
-      console.error("Invite error:", err);
+      logger.error("TeamView", "Invite error", err);
       const msg = err instanceof Error ? err.message : "Unknown error";
       setInviteError(`Failed to send invitation: ${msg}`);
     } finally {

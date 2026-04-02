@@ -1,3 +1,5 @@
+import { logger } from "../services/logger";
+
 /**
  * Retries an async operation with exponential backoff on transient errors.
  * Gives up after maxAttempts and re-throws the last error.
@@ -16,7 +18,7 @@ export async function retryWithBackoff<T>(
       lastError = err;
       if (attempt === maxAttempts) break;
       const delay = baseDelayMs * Math.pow(2, attempt - 1);
-      console.warn(`[retryWithBackoff] ${label} attempt ${attempt} failed, retrying in ${delay}ms`, err);
+      logger.warn("retryWithBackoff", `${label} attempt ${attempt} failed, retrying in ${delay}ms`, err);
       await new Promise((r) => setTimeout(r, delay));
     }
   }

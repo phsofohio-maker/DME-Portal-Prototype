@@ -12,6 +12,7 @@ import { fmtDateTime, fmtShortDate } from "../utils/formatting";
 import { reqTitle } from "../utils/statusHelpers";
 import { exportRequestPdf } from "../utils/pdfExport";
 import { frequencyLabel } from "../data/frequencyOptions";
+import { adminActionSchema } from "../lib/schemas";
 import type { Staff, Request, Patient, RequestStatus, HistoryEntry } from "../types";
 
 // ─── History helpers ──────────────────────────────────────────────────────────
@@ -109,12 +110,10 @@ export default function RequestDetailView({
   const canAct  = isAdmin && (request.status === "pending" || request.status === "rmi");
 
   async function handleAction(newStatus: RequestStatus) {
-    if (newStatus === "denied" && !adminNotes.trim()) {
-      setNotesError("Please provide a reason for denial.");
-      return;
-    }
-    if (newStatus === "rmi" && !adminNotes.trim()) {
-      setNotesError("Please specify what additional information is needed.");
+    const parsed = adminActionSchema.safeParse({ action: newStatus, notes: adminNotes });
+    if (!parsed.success) {
+      const noteErr = parsed.error.issues.find((i) => i.path.includes("notes"));
+      setNotesError(noteErr?.message ?? "Validation failed.");
       return;
     }
     setNotesError("");

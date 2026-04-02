@@ -24,7 +24,7 @@ A single portal that replaces email-based form submissions with a structured, ro
 
 | Layer | Technology | Rationale |
 |-------|-----------|-----------|
-| Frontend | React 19 + TypeScript 5.8 + Vite 6 | Component-based SPA with strict type safety |
+| Frontend | React 19 + TypeScript 5.8 + Vite 5 | Component-based SPA with strict type safety |
 | Auth | Firebase Authentication | Email/password + optional TOTP MFA; HIPAA BAA eligible |
 | Database | Cloud Firestore | Real-time sync, offline support, Security Rules for RBAC |
 | Server Logic | Firebase Cloud Functions (Node.js) | Server-side validation, email triggers, audit log writes |
@@ -46,38 +46,48 @@ parrish-dme-portal/
 ├── tsconfig.json
 ├── vite.config.ts
 ├── firebase.json
-├── firestore.rules              # 180+ lines, RBAC for all 8 collections
+├── firestore.rules              # RBAC for all collections (deny-all default)
 ├── functions/
 │   └── src/
-│       ├── index.ts             # Cloud Functions (5 triggers + 1 callable)
+│       ├── index.ts             # Cloud Functions (6 triggers + 1 callable + 1 scheduled)
 │       └── schemas.ts           # Server-side Zod schemas
 ├── src/
-│   ├── main.tsx
-│   ├── App.tsx                  # Root: auth state, routing, data subscriptions
+│   ├── main.tsx                 # Entry point — wraps App with ErrorBoundary
+│   ├── App.tsx                  # Root: auth state, routing, data subscriptions, idle timeout
 │   ├── tokens.ts                # Design tokens (inline styles)
 │   ├── types.ts                 # Full TypeScript interfaces, discriminated unions
-│   ├── data/                    # Seed data (staff, patients, catalog, drugs)
+│   ├── vite-env.d.ts            # Vite client type declarations
+│   ├── data/                    # Seed/mock data (staff, patients, catalog, requests)
+│   ├── hooks/
+│   │   └── useIdleTimeout.ts    # HIPAA session timeout (15-min idle auto-logoff)
 │   ├── lib/
-│   │   └── schemas.ts           # Client-side Zod schemas
+│   │   └── schemas.ts           # Client-side Zod validation schemas
 │   ├── services/
+│   │   ├── firebase.ts          # Firebase app initialization
 │   │   ├── firebaseService.ts   # Firestore CRUD, Auth, real-time subscriptions
-│   │   ├── logger.ts            # Structured logger (6 levels, HIPAA-safe audit)
-│   │   └── pdfService.ts        # PDF export via jsPDF
+│   │   ├── authService.ts       # Auth helpers (signIn, signOut, onAuthChange)
+│   │   ├── cryptoService.ts     # AES-GCM-256 message encryption/decryption
+│   │   ├── patientService.ts    # Patient lookup (Firestore + mock fallback)
+│   │   └── logger.ts            # Structured logger (info, warn, error)
+│   ├── utils/
+│   │   ├── formatting.ts        # Date, time, initials, age helpers
+│   │   ├── pdfExport.ts         # PDF export via jsPDF
+│   │   ├── retryWithBackoff.ts  # Exponential retry for Firestore writes
+│   │   └── statusHelpers.ts     # Status colors, type labels, role labels
 │   ├── components/
-│   │   ├── Forms/
-│   │   │   ├── DMEForm.tsx      # Zod-validated DME request form
-│   │   │   ├── MedicationForm.tsx
-│   │   │   ├── MultiMedicationForm.tsx
-│   │   │   └── ICD10Field.tsx   # NIH Clinical Tables integration
+│   │   ├── ErrorBoundary.tsx     # React error boundary with recovery UI
+│   │   ├── IdleWarningModal.tsx  # Session timeout warning dialog
+│   │   ├── DrugSearch.tsx        # RxNorm drug search (NIH API)
+│   │   ├── Icd10Search.tsx       # ICD-10 code search (NIH Clinical Tables)
 │   │   ├── Icon.tsx, Badge.tsx, StatusPill.tsx, Card.tsx, ...
 │   │   ├── Sidebar.tsx
 │   │   └── TopBar.tsx
 │   └── views/
 │       ├── LoginScreen.tsx
 │       ├── DashboardView.tsx
-│       ├── AdminInbox.tsx
+│       ├── RequestListView.tsx   # All requests list with filtering
 │       ├── RequestDetailView.tsx
-│       ├── NewRequestView.tsx
+│       ├── NewRequestView.tsx    # DME, Medication, Multi-Med forms (Zod-validated)
 │       ├── MessagesView.tsx
 │       ├── TeamView.tsx
 │       ├── PatientsView.tsx
@@ -104,7 +114,7 @@ Eight Firestore collections with role-based Security Rules:
 | `patients` | Interim patient registry (pre-FHIR) | Read: active staff; Write: admin only |
 | `notifications` | In-app notification system | Read: own only; Create: Cloud Functions only |
 
-The `Request.details` field uses a discriminated union (`DMERequestDetails | MedicationRequestDetails | MultiMedicationRequestDetails`) with a `kind` discriminator to ensure type-safe handling across all request types.
+The `Request.details` field uses a discriminated union (`DMEDetails | MedicationDetails | MultiMedicationDetails`) with a `type` discriminator to ensure type-safe handling across all request types.
 
 ---
 
@@ -112,10 +122,12 @@ The `Request.details` field uses a discriminated union (`DMERequestDetails | Med
 
 | Function | Trigger | Purpose |
 |----------|---------|---------|
-| `onNewRequest` | Firestore `onCreate` on `requests` | Emails all active admins when a new request is submitted |
+| `onNewRequest` | Firestore `onCreate` on `requests` | Validates via Zod; emails all active admins when a new request is submitted |
 | `onRequestStatusChange` | Firestore `onUpdate` on `requests` | Emails the submitter when their request is approved, denied, or RMI'd |
-| `onNewMessage` | Firestore `onCreate` on `communications` | Emails the recipient (respects notification preferences) |
+| `onNewMessage` | Firestore `onCreate` on `communications` | Validates via Zod; emails the recipient (respects notification preferences) |
 | `onNewInvitation` | Firestore `onCreate` on `invitations` | Creates Auth account server-side, generates password-reset link, sends branded invitation email |
+| `onStaffOnboarded` | Firestore `onUpdate` on `staff` | Marks pending invitations as accepted when staff completes onboarding |
+| `cleanupEphemeralMessages` | Scheduled (daily midnight ET) | Deletes ephemeral messages older than the current day |
 | `logAuthEvent` | Callable | Records login/logout events to `audit_log` |
 
 All email functions write to the `mail` Firestore collection. The Firebase Trigger Email Extension handles SMTP delivery. No clinical data (PHI) is included in any email body.
@@ -135,11 +147,12 @@ Four roles are enforced via Firestore Security Rules: `admin`, `nurse`, `homemak
 | Safeguard | Implementation | Status |
 |-----------|---------------|--------|
 | Access Control (§164.312(a)) | Firebase Auth + Firestore Security Rules with RBAC | Done |
+| Automatic Logoff (§164.312(a)(2)(iii)) | 15-minute idle timeout with warning modal; auto-logoff with audit trail | Done |
 | Audit Controls (§164.312(b)) | Immutable `audit_log`; Cloud Function triggers; before/after diffs | Done |
 | Integrity Controls (§164.312(c)) | Zod validation (client + server); no client-side writes to critical collections | Done |
 | Transmission Security (§164.312(e)) | TLS 1.3 via Firebase Hosting; HSTS preload | Done |
 | Encryption at Rest | Firestore AES-256 (Google-managed keys) | Done |
-| Application-Layer Encryption | AES-256 for messaging content | Done |
+| Application-Layer Encryption | AES-GCM-256 for messaging content via Web Crypto API | Done |
 | BAA — Google Cloud | Required before any PHI enters the system | Pending (Legal) |
 
 ---
@@ -195,7 +208,7 @@ firebase deploy --only hosting
 
 ### Environment Configuration
 
-The Firebase project configuration is loaded from `src/services/firebaseService.ts`. For production deployments, ensure the Trigger Email Extension is configured in the Firebase Console with SMTP credentials for `notifications@harmonyhca.org`.
+The Firebase project configuration is loaded from `src/services/firebase.ts` via Vite environment variables (`VITE_FIREBASE_*`). For production deployments, ensure the Trigger Email Extension is configured in the Firebase Console with SMTP credentials for `notifications@harmonyhca.org`.
 
 ---
 

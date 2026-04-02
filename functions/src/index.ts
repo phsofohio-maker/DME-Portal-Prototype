@@ -20,6 +20,7 @@ import {setGlobalOptions} from "firebase-functions";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
 import {onDocumentCreated, onDocumentUpdated} from "firebase-functions/v2/firestore";
 import {onSchedule} from "firebase-functions/v2/scheduler";
+import {requestCreateSchema, messageCreateSchema} from "./schemas";
 
 initializeApp();
 const db = getFirestore();
@@ -43,6 +44,15 @@ const STATUS_SUBJECTS: Record<string, string> = {
   denied: "denied",
   rmi: "needs more information",
 };
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 
 function portalLink(): string {
   return "https://dme-portal.web.app";
@@ -90,9 +100,18 @@ export const onNewRequest = onDocumentCreated(
     const data = event.data?.data();
     if (!data) return;
 
+    // Validate document shape
+    const parsed = requestCreateSchema.safeParse(data);
+    if (!parsed.success) {
+      console.warn(
+        `[onNewRequest] Invalid request document ${event.params.requestId}:`,
+        parsed.error.issues
+      );
+    }
+
     // Fetch submitter name
     const submitterSnap = await db.collection("staff").doc(data.submittedBy).get();
-    const submitterName: string = submitterSnap.data()?.displayName ?? "A staff member";
+    const submitterName: string = escapeHtml(submitterSnap.data()?.displayName ?? "A staff member");
 
     // Fetch all active admin emails
     const adminsSnap = await db.collection("staff")
@@ -166,7 +185,7 @@ export const onRequestStatusChange = onDocumentUpdated(
 
     const notesHtml = adminNotes ?
       `<p style="margin-top:12px;padding:12px;background:#F7F4EF;border-radius:6px;">
-           <strong>Note from reviewer:</strong> ${adminNotes}
+           <strong>Note from reviewer:</strong> ${escapeHtml(adminNotes)}
          </p>` :
       "";
 
@@ -200,6 +219,15 @@ export const onNewMessage = onDocumentCreated(
     const data = event.data?.data();
     if (!data) return;
 
+    // Validate document shape
+    const parsed = messageCreateSchema.safeParse(data);
+    if (!parsed.success) {
+      console.warn(
+        `[onNewMessage] Invalid message document ${event.params.messageId}:`,
+        parsed.error.issues
+      );
+    }
+
     // Fetch recipient — check notification prefs
     const recipientSnap = await db.collection("staff").doc(data.recipientId).get();
     const recipient = recipientSnap.data();
@@ -209,7 +237,7 @@ export const onNewMessage = onDocumentCreated(
 
     // Fetch sender name
     const senderSnap = await db.collection("staff").doc(data.senderId).get();
-    const senderName: string = senderSnap.data()?.displayName ?? "A team member";
+    const senderName: string = escapeHtml(senderSnap.data()?.displayName ?? "A team member");
 
     const subject = `New message from ${senderName}`;
     const html = emailWrapper(`
@@ -252,7 +280,7 @@ export const onNewInvitation = onDocumentCreated(
     const email: string = data.email;
     const rawRole: string = data.role;
     const roleLabel: string = ROLE_LABELS[rawRole] ?? rawRole;
-    const invitedByName: string = data.invitedByName ?? "An administrator";
+    const invitedByName: string = escapeHtml(data.invitedByName ?? "An administrator");
 
     // 1. Create Firebase Auth account (or find existing one)
     let uid: string;

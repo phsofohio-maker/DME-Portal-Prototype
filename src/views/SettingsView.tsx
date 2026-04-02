@@ -8,6 +8,7 @@ import Input from "../components/Input";
 import Icon from "../components/Icon";
 import { roleLabel } from "../utils/statusHelpers";
 import { firebaseService } from "../services/firebaseService";
+import { profileUpdateSchema } from "../lib/schemas";
 import type { Staff } from "../types";
 
 const ROLE_COLORS: Record<string, string> = {
@@ -36,6 +37,11 @@ export default function SettingsView({ user, onUpdateUser }: SettingsViewProps) 
   const [saveError,     setSaveError]     = useState("");
 
   async function handleSave() {
+    const parsed = profileUpdateSchema.safeParse({ displayName });
+    if (!parsed.success) {
+      setSaveError(parsed.error.issues[0]?.message ?? "Validation failed.");
+      return;
+    }
     setSaving(true);
     setSaveError("");
     try {

@@ -114,7 +114,7 @@ export const firebaseService = {
   },
 
   logout: async (): Promise<void> => {
-    try { await httpsCallable(functions, 'logAuthEvent')({ action: 'auth.logout' }); } catch {}
+    try { await httpsCallable(functions, 'logAuthEvent')({ action: 'auth.logout' }); } catch (err) { logger.warn('firebaseService', 'Failed to log auth.logout event', err); }
     await signOut(auth);
   },
 

@@ -5,8 +5,10 @@ import { T } from "./tokens";
 import { PATIENTS } from "./data/patients";
 import { onAuthChange, fetchStaffProfile, signOutUser } from "./services/authService";
 import { firebaseService } from "./services/firebaseService";
+import { useIdleTimeout } from "./hooks/useIdleTimeout";
 import Sidebar from "./components/Sidebar";
 import TopBar from "./components/TopBar";
+import IdleWarningModal from "./components/IdleWarningModal";
 import LoginScreen from "./views/LoginScreen";
 import DashboardView from "./views/DashboardView";
 import PatientsView from "./views/PatientsView";
@@ -153,6 +155,21 @@ export default function App() {
     setShowNotifs(false);
   }
 
+  // ── HIPAA session timeout (15 min idle → auto-logoff) ─────────────────
+  const { showWarning, remainingSeconds, stayLoggedIn } = useIdleTimeout({
+    onTimeout: () => {
+      firebaseService.logout();
+      setUser(null);
+      setView("dashboard");
+      setSelectedRequest(null);
+      setSelectedPatient(null);
+      setNewRequestPatient("");
+      setShowNotifs(false);
+      setLoginError("You were logged out due to inactivity.");
+    },
+    enabled: !!user,
+  });
+
   // ── Render gates ─────────────────────────────────────────────────────────
   if (authLoading) return <AuthLoading />;
   if (!user) return <LoginScreen externalError={loginError} />;
@@ -160,6 +177,13 @@ export default function App() {
   // ── Authenticated shell ───────────────────────────────────────────────────
   return (
     <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: T.bg }}>
+      {showWarning && (
+        <IdleWarningModal
+          remainingSeconds={remainingSeconds}
+          onStay={stayLoggedIn}
+          onLogout={logout}
+        />
+      )}
       <Sidebar
         user={user}
         view={view}

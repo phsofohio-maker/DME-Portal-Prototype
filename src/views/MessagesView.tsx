@@ -10,6 +10,8 @@ import Badge from "../components/Badge";
 import { timeAgo, getInitials } from "../utils/formatting";
 import { roleLabel } from "../utils/statusHelpers";
 import { firebaseService } from "../services/firebaseService";
+import { logger } from "../services/logger";
+import { messageSchema } from "../lib/schemas";
 import type { Staff, Communication } from "../types";
 
 const ROLE_COLORS: Record<string, string> = {
@@ -189,7 +191,7 @@ function ReplyInput({
       });
       setBody("");
     } catch (err) {
-      console.error("Message reply failed:", err);
+      logger.error("MessagesView", "Message reply failed", err);
       setError("Failed to send. Please try again.");
     } finally {
       setSending(false);
@@ -271,10 +273,16 @@ function ComposeForm({
   const recipients = staff.filter((s) => s.uid !== currentUser.uid);
 
   async function handleSend() {
-    const e: typeof errors = {};
-    if (!recipientId) e.recipient = "Please select a recipient.";
-    if (!body.trim()) e.body = "Message cannot be empty.";
-    if (Object.keys(e).length) { setErrors(e); return; }
+    const parsed = messageSchema.safeParse({ recipientId, messageBody: body.trim() });
+    if (!parsed.success) {
+      const e: typeof errors = {};
+      for (const issue of parsed.error.issues) {
+        if (issue.path[0] === "recipientId") e.recipient = issue.message;
+        if (issue.path[0] === "messageBody") e.body = issue.message;
+      }
+      setErrors(e);
+      return;
+    }
 
     setSending(true);
     setSendError("");
@@ -287,7 +295,7 @@ function ComposeForm({
       onSent(recipientId);
       onClose();
     } catch (err) {
-      console.error("Message send failed:", err);
+      logger.error("MessagesView", "Message send failed", err);
       setSendError("Failed to send. Please try again.");
     } finally {
       setSending(false);
