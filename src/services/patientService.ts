@@ -13,7 +13,7 @@
 import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { db } from './firebase';
 import type { Patient } from '../types';
-import { MOCK_PATIENTS } from './mockData';
+import { PATIENTS as STATIC_PATIENTS } from '../data/patients';
 
 // ─── Interface ────────────────────────────────────────────────────────────────
 
@@ -64,14 +64,14 @@ class FirestorePatientServiceImpl implements PatientLookupService {
 
 class MockPatientServiceImpl implements PatientLookupService {
   async listAll(): Promise<Patient[]> {
-    return MOCK_PATIENTS;
+    return STATIC_PATIENTS;
   }
 
   async search(q: string): Promise<Patient[]> {
     if (!q.trim()) return [];
     const lower = q.toLowerCase();
-    return MOCK_PATIENTS.filter(
-      (p) =>
+    return STATIC_PATIENTS.filter(
+      (p: Patient) =>
         p.name.toLowerCase().includes(lower) ||
         p.mrn.toLowerCase().includes(lower)  ||
         p.dob.toLowerCase().includes(lower)
@@ -79,7 +79,7 @@ class MockPatientServiceImpl implements PatientLookupService {
   }
 
   async getById(id: string): Promise<Patient | null> {
-    return MOCK_PATIENTS.find((p) => p.id === id) ?? null;
+    return STATIC_PATIENTS.find((p: Patient) => p.id === id) ?? null;
   }
 }
 

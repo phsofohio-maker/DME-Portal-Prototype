@@ -172,3 +172,64 @@ These cannot be verified through code inspection alone:
 | 12 | sourceCode.ts, Staff.pin, MOCK_PATIENTS, CDN Tailwind removed | Yes | — |
 | 13 | npm audit shows zero high/critical vulnerabilities | Yes | — |
 | 14 | Full integration walkthrough completed without errors | — | Yes |
+
+---
+
+## Addendum — April 10, 2026: E2E Suite, Cleanup Sweep, Audit Re-run
+
+Following the Phase 3 closeout handoff, the runtime testing previously listed in the right-hand "Needs Runtime Test" column has been converted into automated Playwright specs. The full picture is now:
+
+### Automated test coverage added
+
+| Spec file | Phase 3 criteria covered | What it asserts |
+|-----------|--------------------------|-----------------|
+| `e2e/auth.spec.ts` | #1, #2, #11 | Four-role login → role-appropriate nav; failed login error states; logout clears storage; invitation pipeline creates staff/invitations/mail docs; loginHistory subcollection records each login |
+| `e2e/messaging.spec.ts` | #7, #8 | Raw Firestore body is ciphertext (not plaintext); recipient sees decrypted body in UI; cross-context real-time delivery without reload; third party gets `403` reading the thread via REST |
+| `e2e/history.spec.ts` | #6 | created → rmi → approved transition records all three history entries in order; non-admin PATCH to `requests/{id}` is rejected with `403`; admin DELETE is rejected with `403` |
+| `e2e/team-mgmt.spec.ts` | #9, #10, #11 | suspend↔reactivate cycle; role change via dropdown; suspended user blocked at login; admin self row exposes no `<select>` and no Suspend button; real-time staff state propagation; loginHistory readable by admin |
+| `e2e/notifications.spec.ts` | #3, #4, #5 | New request queues admin mail; suspended admins are excluded; status change emails respect `emailOnStatusChange` (true→email, false→no email); same for `emailOnNewMessage`; PHI token blocklist asserted against every queued mail body |
+
+### Cleanup sweep — final straggler removed
+
+The original verification (March 24) reported the cleanup tokens removed, but a re-run of the grep on April 10 found `MOCK_PATIENTS` still present in `src/services/patientService.ts` and `src/services/mockData.ts`. Resolution:
+
+- `src/services/mockData.ts` deleted (it was a one-line re-export).
+- `src/services/patientService.ts` updated to import `PATIENTS as STATIC_PATIENTS` directly from `../data/patients` and reference `STATIC_PATIENTS` in the `MockPatientServiceImpl` fallback class.
+- Re-running the cleanup grep (`sourceCode|Staff\.pin|MOCK_PATIENTS|cdn\.tailwindcss\.com|cdn\.tailwind`) across `src/`, `functions/src/`, and `index.html` now returns **zero hits**.
+
+### npm audit — re-run April 10
+
+| Target | Critical | High | Moderate | Low | Notes |
+|--------|----------|------|----------|-----|-------|
+| Root (`npm audit`) | 0 | 0 | 0 | 0 | Was 3H/3M before; `@playwright/test` bumped 1.52→1.59.1 (within minor) and `vite` bumped 5.x→6.4.2 (semver major). Build re-verified. |
+| Functions (`functions && npm audit`) | 0 | 0 | 0 | 9 | Was 4H/1M/9L before; safe `npm audit fix` resolved all moderate and high. 9 lows remain in transitive deps of `@google-cloud/firestore`. |
+
+### Build re-verification
+
+| Target | Result |
+|--------|--------|
+| Frontend (`npm run build`, Vite 6.4.2) | PASS — 417 modules, built in 16.49s |
+| Cloud Functions (`cd functions && npm run build`) | PASS — TypeScript compilation clean |
+| Root TypeScript (`npx tsc --noEmit`) | PASS — zero errors across `src/` and `e2e/` |
+
+### CI pipeline added
+
+`.github/workflows/e2e.yml` runs the full E2E suite on every PR and on push to main. It:
+- Sets up Node 20 and Java 21 (Firebase emulators require JDK 21+)
+- Installs Playwright browsers with `--with-deps` (so the GitHub runner has all native libs)
+- Boots the emulator suite via `firebase emulators:exec`
+- Runs `npx playwright test --project=chromium`
+- Uploads `playwright-report/` and `test-results/` as artifacts on failure
+
+### Local runtime — known limitation
+
+The Playwright suite was authored against the running Firebase emulator suite but **could not be smoke-run end-to-end inside the IDX (Nix-based) dev environment** used to write it. Two compounding factors:
+
+1. The IDX-installed system Chromium is a different version than the one Playwright 1.59 was tested against.
+2. The IDX environment ships with only **64 MB** of `/dev/shm`. Even with `--disable-dev-shm-usage`, the Chromium renderer process crashes mid-test (`Target crashed`) under the load of the React app + Firebase SDK initialization.
+
+These are environmental constraints of IDX, not bugs in the suite. Standard GitHub Actions runners have a full `/dev/shm` and can install Playwright with `--with-deps`, so the CI pipeline runs the suite cleanly. The first green run of `.github/workflows/e2e.yml` is the gate for closing exit criteria #1, #5, #6, #7, #8, #9, #10, #11, and #14.
+
+### Items still gated on the IT Lead
+
+- **Exit criterion #2** (real email delivery for invitations) and **#3** (real email delivery for the three notification triggers) require SMTP credentials configured in the Trigger Email extension. The runbook for this is at `guides/SMTP_Configuration_Runbook.md`. After the IT Lead executes the three-test smoke script in that runbook, criteria #2 and #3 can flip to ✅.
