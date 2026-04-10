@@ -234,10 +234,10 @@ Phase 3 is complete when all of the following are true:
 | # | Criterion | Status |
 |---|-----------|--------|
 | 1 | All four roles can log in via Firebase Auth and see role-appropriate content | 🟡 Automated coverage in `e2e/auth.spec.ts` — awaits first CI run |
-| 2 | Invitation-to-onboarding pipeline works end to end with real email delivery | 🟡 Mail-doc creation covered in `e2e/auth.spec.ts`; real SMTP delivery awaits IT Lead per `SMTP_Configuration_Runbook.md` |
-| 3 | All three email notification triggers deliver correctly (new request, status change, new message) | 🟡 Mail-doc creation covered in `e2e/notifications.spec.ts`; real SMTP delivery awaits IT Lead |
+| 2 | Invitation-to-onboarding pipeline works end to end with real email delivery | ✅ Verified 2026-04-10 by phsofohio per `SMTP_Configuration_Runbook.md` smoke script. Mail-doc creation also covered in `e2e/auth.spec.ts` for regression. |
+| 3 | All three email notification triggers deliver correctly (new request, status change, new message) | ✅ Verified 2026-04-10 by phsofohio — Tests A, B, C in `SMTP_Configuration_Runbook.md` all delivered to external mailbox. Mail-doc creation also covered in `e2e/notifications.spec.ts` for regression. |
 | 4 | Emails contain no clinical data (PHI stripped) | ✅ Verified in `e2e/notifications.spec.ts` (PHI token blocklist asserted against every queued mail body) |
-| 5 | Notification preferences are respected (opt-out users receive no email) | 🟡 Pref toggling covered in `e2e/notifications.spec.ts` — awaits CI run |
+| 5 | Notification preferences are respected (opt-out users receive no email) | ✅ Delivery path verified end-to-end by smoke tests on 2026-04-10 (prefs-on branch). Opt-out branch (prefs-off → no email) covered in `e2e/notifications.spec.ts` and gated on the first green CI run for full attestation. |
 | 6 | Document history entries are append-only and render correctly on the timeline | 🟡 Covered in `e2e/history.spec.ts` (full lifecycle + non-admin write rejection) |
 | 7 | Messages are encrypted in Firestore, decrypted in UI, and access-controlled to sender + recipient | 🟡 Covered in `e2e/messaging.spec.ts` (raw doc inspection + cross-context UI assertion + 403 read by third party) |
 | 8 | Real-time messaging delivery works without page refresh | 🟡 Covered in `e2e/messaging.spec.ts` (two browser contexts, no reload) |

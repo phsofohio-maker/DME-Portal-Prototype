@@ -140,6 +140,7 @@ These cannot be verified through code inspection alone:
 | 8 | History entries appear for all lifecycle events (create/approve/deny/RMI) | Block 3 |
 | 9 | Team management actions update in real-time across sessions | Block 5 |
 | 10 | Full end-to-end integration walkthrough (Block 6 checklist) | Block 6 |
+| ✓ | **2026-04-10 — phsofohio (IT Lead):** verified — three smoke tests passed. Tests A and C delivered to external mailbox; no spam filtering, no PHI leaks, no encryption bypass. | Block 2 (closes runtime items #3, #4, #5) |
 
 ---
 
