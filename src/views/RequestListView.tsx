@@ -13,6 +13,7 @@ const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
   { id: "approved", label: "Approved"     },
   { id: "rmi",      label: "Needs Info"   },
   { id: "denied",   label: "Denied"       },
+  { id: "filled",   label: "Filled"       },
 ];
 
 const TYPE_FILTERS: { id: TypeFilter; label: string }[] = [

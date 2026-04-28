@@ -17,6 +17,7 @@ function statusLabel(s: string) {
     case "approved": return "Approved";
     case "denied":   return "Denied";
     case "rmi":      return "Needs Info";
+    case "filled":   return "Filled";
     default:         return s;
   }
 }
@@ -202,9 +203,11 @@ export function exportRequestPdf(
     labelValue(doc, y, "Urgency", urgencyLabel(details.urgency), { colOffset: col2, bold: details.urgency !== "routine" });
     y += 11;
 
-    labelValue(doc, y, "ICD-10 Code", details.icd10Code);
-    labelValue(doc, y, "Diagnosis", details.icd10Description, { colOffset: col2 });
-    y += 14;
+    if (details.icd10Code) {
+      labelValue(doc, y, "ICD-10 Code", details.icd10Code);
+      labelValue(doc, y, "Diagnosis", details.icd10Description ?? "", { colOffset: col2 });
+      y += 14;
+    }
 
     y = wrappedParagraph(doc, y, "Clinical Justification", details.justification);
   }

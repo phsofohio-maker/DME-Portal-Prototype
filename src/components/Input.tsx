@@ -20,16 +20,17 @@ export interface TextareaProps extends SharedProps, React.TextareaHTMLAttributes
 function fieldBase(focused: boolean, hasError: boolean): React.CSSProperties {
   return {
     width: "100%",
-    fontSize: 14,
+    fontSize: 15,
     color: T.text,
     background: T.bgCard,
-    border: `1px solid ${hasError ? T.urgent : focused ? T.accent : T.border}`,
+    border: `1.5px solid ${hasError ? T.urgent : focused ? T.accent : T.border}`,
     borderRadius: T.radiusSm,
     padding: "10px 12px",
     outline: "none",
     fontFamily: T.font,
-    transition: "border-color 0.12s",
+    transition: "border-color 0.15s ease, box-shadow 0.15s ease",
     boxSizing: "border-box",
+    boxShadow: focused && !hasError ? `0 0 0 3px ${T.accentGhost}` : "none",
   };
 }
 
@@ -38,11 +39,9 @@ function LabelRow({ label, required }: { label?: string; required?: boolean }) {
   return (
     <label
       style={{
-        fontSize: 12,
+        fontSize: 13,
         fontWeight: 600,
-        color: T.textSub,
-        textTransform: "uppercase",
-        letterSpacing: 0.3,
+        color: T.text,
       }}
     >
       {label}

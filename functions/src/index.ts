@@ -43,7 +43,23 @@ const STATUS_SUBJECTS: Record<string, string> = {
   approved: "approved",
   denied: "denied",
   rmi: "needs more information",
+  filled: "filled",
 };
+
+async function writeAuditLog(
+  action: string,
+  actorId: string,
+  actorEmail: string,
+  metadata: Record<string, unknown> = {}
+): Promise<void> {
+  await db.collection("audit_log").add({
+    action,
+    actorId,
+    actorEmail,
+    timestamp: FieldValue.serverTimestamp(),
+    metadata,
+  });
+}
 
 function escapeHtml(str: string): string {
   return str
@@ -109,9 +125,22 @@ export const onNewRequest = onDocumentCreated(
       );
     }
 
-    // Fetch submitter name
+    // Fetch submitter name + email
     const submitterSnap = await db.collection("staff").doc(data.submittedBy).get();
-    const submitterName: string = escapeHtml(submitterSnap.data()?.displayName ?? "A staff member");
+    const submitterDoc  = submitterSnap.data();
+    const submitterName: string = escapeHtml(submitterDoc?.displayName ?? "A staff member");
+
+    // Audit log — record creation (no PHI, just IDs + type)
+    await writeAuditLog(
+      "request.created",
+      data.submittedBy,
+      submitterDoc?.email ?? "",
+      {
+        requestId: event.params.requestId,
+        requestType: data.details?.type ?? "unknown",
+        patientId: data.patientId,
+      }
+    );
 
     // Fetch all active admin emails
     const adminsSnap = await db.collection("staff")
@@ -155,7 +184,29 @@ export const onRequestStatusChange = onDocumentUpdated(
     if (before.status === after.status) return;
 
     const newStatus: string = after.status;
-    if (!["approved", "denied", "rmi"].includes(newStatus)) return;
+    if (!["approved", "denied", "rmi", "filled"].includes(newStatus)) return;
+
+    // Audit log — record the lifecycle change (no PHI)
+    const processorId: string = after.processedBy ?? "";
+    let processorEmail = "";
+    if (processorId) {
+      const procSnap = await db.collection("staff").doc(processorId).get();
+      processorEmail = procSnap.data()?.email ?? "";
+    }
+    await writeAuditLog(
+      `request.${newStatus}`,
+      processorId,
+      processorEmail,
+      {
+        requestId: event.params.requestId,
+        requestType: after.details?.type ?? "unknown",
+        patientId: after.patientId,
+        previousStatus: before.status,
+      }
+    );
+
+    // 'filled' is an internal admin-only step — no submitter email
+    if (newStatus === "filled") return;
 
     // Respect submitter's notification prefs
     const submitterSnap = await db.collection("staff").doc(after.submittedBy).get();

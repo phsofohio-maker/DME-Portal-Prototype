@@ -1,3 +1,5 @@
+import { T } from "../tokens";
+
 interface BadgeProps {
   count: number;
 }
@@ -10,11 +12,11 @@ export default function Badge({ count }: BadgeProps) {
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
-        minWidth: 18,
-        height: 18,
-        padding: "0 5px",
-        borderRadius: 9,
-        background: "#C4533A",
+        minWidth: 20,
+        height: 20,
+        padding: "0 6px",
+        borderRadius: T.radiusFull,
+        background: T.accent,
         color: "#fff",
         fontSize: 11,
         fontWeight: 700,

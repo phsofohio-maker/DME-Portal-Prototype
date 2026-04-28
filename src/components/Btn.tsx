@@ -27,14 +27,16 @@ const base: React.CSSProperties = {
   borderRadius: T.radiusSm,
   fontFamily: T.font,
   fontWeight: 600,
+  letterSpacing: "-0.005em",
   cursor: "pointer",
-  transition: "background 0.12s, color 0.12s, border-color 0.12s, box-shadow 0.12s",
+  transition: "background 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.08s ease",
   whiteSpace: "nowrap",
+  lineHeight: 1.4,
 };
 
 const sizes: Record<BtnSize, React.CSSProperties> = {
-  sm: { fontSize: 12, padding: "6px 12px" },
-  md: { fontSize: 14, padding: "9px 16px" },
+  sm: { fontSize: 13, padding: "6px 14px" },
+  md: { fontSize: 14, padding: "9px 18px" },
 };
 
 type VariantStyle = {
@@ -44,25 +46,87 @@ type VariantStyle = {
 };
 
 const variants: Record<BtnVariant, VariantStyle> = {
+  // HALO green primary
   primary: {
-    default:  { background: T.accent,    color: "#fff",    border: `1px solid ${T.accent}`    },
-    hover:    { background: T.accentDark, color: "#fff",   border: `1px solid ${T.accentDark}` },
-    disabled: { background: T.border,    color: T.textLight, border: `1px solid ${T.border}`  },
+    default: {
+      background: T.accent,
+      color: "#fff",
+      border: `1px solid ${T.accent}`,
+      boxShadow: "none",
+    },
+    hover: {
+      background: T.accentDark,
+      color: "#fff",
+      border: `1px solid ${T.accentDark}`,
+      boxShadow: "0 2px 8px rgba(30,158,73,0.25)",
+    },
+    disabled: {
+      background: T.border,
+      color: T.textLight,
+      border: `1px solid ${T.border}`,
+      boxShadow: "none",
+    },
   },
+  // Neutral outline (kept as "secondary" for back-compat with existing callsites)
   secondary: {
-    default:  { background: T.bgCard,    color: T.text,    border: `1px solid ${T.border}`    },
-    hover:    { background: T.bgHover,   color: T.text,    border: `1px solid ${T.border}`    },
-    disabled: { background: T.bgCard,    color: T.textLight, border: `1px solid ${T.border}`  },
+    default: {
+      background: T.bgCard,
+      color: T.text,
+      border: `1px solid ${T.border}`,
+      boxShadow: "none",
+    },
+    hover: {
+      background: T.bgSub,
+      color: T.text,
+      border: `1px solid ${T.textLight}`,
+      boxShadow: "none",
+    },
+    disabled: {
+      background: T.bgCard,
+      color: T.textLight,
+      border: `1px solid ${T.border}`,
+      boxShadow: "none",
+    },
   },
   danger: {
-    default:  { background: T.urgent,    color: "#fff",    border: `1px solid ${T.urgent}`    },
-    hover:    { background: "#A8402A",   color: "#fff",    border: `1px solid #A8402A`         },
-    disabled: { background: T.border,    color: T.textLight, border: `1px solid ${T.border}`  },
+    default: {
+      background: T.urgent,
+      color: "#fff",
+      border: `1px solid ${T.urgent}`,
+      boxShadow: "none",
+    },
+    hover: {
+      background: "#C82333",
+      color: "#fff",
+      border: "1px solid #C82333",
+      boxShadow: "0 2px 8px rgba(220,53,69,0.25)",
+    },
+    disabled: {
+      background: T.border,
+      color: T.textLight,
+      border: `1px solid ${T.border}`,
+      boxShadow: "none",
+    },
   },
   ghost: {
-    default:  { background: "transparent", color: T.textSub, border: "1px solid transparent"  },
-    hover:    { background: T.bgSub,     color: T.text,    border: "1px solid transparent"    },
-    disabled: { background: "transparent", color: T.textLight, border: "1px solid transparent"},
+    default: {
+      background: "transparent",
+      color: T.textSub,
+      border: "1px solid transparent",
+      boxShadow: "none",
+    },
+    hover: {
+      background: T.bgSub,
+      color: T.text,
+      border: "1px solid transparent",
+      boxShadow: "none",
+    },
+    disabled: {
+      background: "transparent",
+      color: T.textLight,
+      border: "1px solid transparent",
+      boxShadow: "none",
+    },
   },
 };
 

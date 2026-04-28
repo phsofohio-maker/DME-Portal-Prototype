@@ -7,7 +7,7 @@ import type { UserRole } from "../types";
 
 const ROLE_COLORS: Record<UserRole, string> = {
   admin:        T.accent,
-  nurse:        T.info,
+  nurse:        T.secondary,
   homemaker:    T.warn,
   office_staff: T.purple,
 };
@@ -21,7 +21,6 @@ function DevQuickSelect({ onSigningIn }: { onSigningIn: (id: string) => void }) 
     setLoading(uid);
     try {
       await signIn(email, "Parrish2024!");
-      // App.tsx onAuthStateChanged fires automatically — no setUser needed here
     } catch {
       setLoading(null);
     }
@@ -39,8 +38,17 @@ function DevQuickSelect({ onSigningIn }: { onSigningIn: (id: string) => void }) 
         }}
       >
         <div style={{ flex: 1, height: 1, background: T.borderLight }} />
-        <span style={{ fontSize: 11, color: T.textLight, fontWeight: 500, whiteSpace: "nowrap" }}>
-          DEV — quick sign in
+        <span
+          style={{
+            fontSize: 11,
+            color: T.textLight,
+            fontWeight: 600,
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+            whiteSpace: "nowrap",
+          }}
+        >
+          Dev — quick sign in
         </span>
         <div style={{ flex: 1, height: 1, background: T.borderLight }} />
       </div>
@@ -69,13 +77,14 @@ function DevQuickSelect({ onSigningIn }: { onSigningIn: (id: string) => void }) 
                 fontFamily: T.font,
                 textAlign: "left",
                 width: "100%",
+                transition: "border-color 0.15s ease, box-shadow 0.15s ease",
               }}
             >
               <div
                 style={{
                   width: 34,
                   height: 34,
-                  borderRadius: "50%",
+                  borderRadius: T.radiusFull,
                   background: color + "18",
                   color,
                   display: "flex",
@@ -104,8 +113,8 @@ function DevQuickSelect({ onSigningIn }: { onSigningIn: (id: string) => void }) 
               </div>
               <span
                 style={{
-                  padding: "2px 8px",
-                  borderRadius: 20,
+                  padding: "2px 10px",
+                  borderRadius: T.radiusFull,
                   background: color + "18",
                   color,
                   fontSize: 11,
@@ -131,9 +140,10 @@ export default function LoginScreen({ externalError }: { externalError?: string 
   const [error,    setError]    = useState("");
   const [loading,  setLoading]  = useState(false);
   const [devSigningIn, setDevSigningIn] = useState(false);
+  const [emailFocused, setEmailFocused] = useState(false);
+  const [passwordFocused, setPasswordFocused] = useState(false);
 
   const displayError = error || externalError || "";
-
   const isDev = import.meta.env.DEV;
 
   async function handleSubmit(e: React.FormEvent) {
@@ -143,7 +153,6 @@ export default function LoginScreen({ externalError }: { externalError?: string 
     setLoading(true);
     try {
       await signIn(email.trim(), password);
-      // onAuthStateChanged in App.tsx handles the rest
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes("user-not-found") || msg.includes("wrong-password") || msg.includes("invalid-credential")) {
@@ -158,69 +167,82 @@ export default function LoginScreen({ externalError }: { externalError?: string 
     }
   }
 
+  const inputStyle = (focused: boolean): React.CSSProperties => ({
+    fontSize: 15,
+    color: T.text,
+    background: T.bgCard,
+    border: `1.5px solid ${displayError ? T.urgent : focused ? T.accent : T.border}`,
+    borderRadius: T.radiusSm,
+    padding: "10px 12px",
+    outline: "none",
+    fontFamily: T.font,
+    boxShadow: focused && !displayError ? `0 0 0 3px ${T.accentGhost}` : "none",
+    transition: "border-color 0.15s ease, box-shadow 0.15s ease",
+  });
+
   return (
     <div
       style={{
         minHeight: "100vh",
-        background: T.bg,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         padding: 24,
+        backgroundColor: T.bg,
+        backgroundImage: "url('/images/HALO_Background.png')",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
       }}
     >
-      <div style={{ width: "100%", maxWidth: 460 }}>
-
-        {/* Logo */}
-        <div style={{ textAlign: "center", marginBottom: 36 }}>
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: 56,
-              height: 56,
-              borderRadius: 14,
-              background: T.accent,
-              marginBottom: 16,
-            }}
-          >
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-            </svg>
-          </div>
-          <h1
-            style={{
-              fontFamily: T.fontDisplay,
-              fontSize: 32,
-              fontWeight: 400,
-              color: T.text,
-              marginBottom: 6,
-              letterSpacing: "-0.3px",
-            }}
-          >
-            Parrish Health
-          </h1>
-          <p style={{ fontSize: 15, color: T.textSub }}>DME Portal — Staff Access</p>
-        </div>
-
-        {/* Card */}
+      <div style={{ width: "100%", maxWidth: 440 }}>
+        {/* Auth card with glass surface */}
         <div
           style={{
-            background: T.bgCard,
+            background: "rgba(255,255,255,0.88)",
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
             border: `1px solid ${T.borderLight}`,
-            borderRadius: T.radius,
+            borderRadius: T.radiusLg,
             boxShadow: T.shadowLg,
-            padding: 32,
+            padding: "40px 36px 32px",
           }}
         >
-          <h2 style={{ fontSize: 18, fontWeight: 600, color: T.text, marginBottom: 20 }}>
+          {/* Logo */}
+          <div style={{ textAlign: "center", marginBottom: 28 }}>
+            <img
+              src="/images/HALO_DMEEPS_.svg"
+              alt="Parrish HALO DME"
+              style={{
+                width: 280,
+                maxWidth: "100%",
+                height: "auto",
+                objectFit: "contain",
+                display: "inline-block",
+              }}
+            />
+            <p style={{ fontSize: 14, color: T.textLight, marginTop: 10, fontWeight: 500 }}>
+              Nurse Owned &amp; Operated
+            </p>
+          </div>
+
+          <h2
+            style={{
+              fontSize: 18,
+              fontWeight: 700,
+              color: T.text,
+              marginBottom: 6,
+              letterSpacing: "-0.01em",
+            }}
+          >
             Sign in to your account
           </h2>
+          <p style={{ fontSize: 13, color: T.textSub, marginBottom: 22 }}>
+            Staff access — DME Portal
+          </p>
 
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: T.textSub, textTransform: "uppercase", letterSpacing: 0.3 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: T.text }}>
                 Email
               </label>
               <input
@@ -228,22 +250,15 @@ export default function LoginScreen({ externalError }: { externalError?: string 
                 autoComplete="email"
                 value={email}
                 onChange={(e) => { setEmail(e.target.value); setError(""); }}
+                onFocus={() => setEmailFocused(true)}
+                onBlur={() => setEmailFocused(false)}
                 placeholder="you@parrish.health"
-                style={{
-                  fontSize: 14,
-                  color: T.text,
-                  background: T.bgCard,
-                  border: `1px solid ${displayError ? T.urgent : T.border}`,
-                  borderRadius: T.radiusSm,
-                  padding: "10px 12px",
-                  outline: "none",
-                  fontFamily: T.font,
-                }}
+                style={inputStyle(emailFocused)}
               />
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: T.textSub, textTransform: "uppercase", letterSpacing: 0.3 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: T.text }}>
                 Password
               </label>
               <input
@@ -251,40 +266,34 @@ export default function LoginScreen({ externalError }: { externalError?: string 
                 autoComplete="current-password"
                 value={password}
                 onChange={(e) => { setPassword(e.target.value); setError(""); }}
+                onFocus={() => setPasswordFocused(true)}
+                onBlur={() => setPasswordFocused(false)}
                 placeholder="Enter your password"
-                style={{
-                  fontSize: 14,
-                  color: T.text,
-                  background: T.bgCard,
-                  border: `1px solid ${displayError ? T.urgent : T.border}`,
-                  borderRadius: T.radiusSm,
-                  padding: "10px 12px",
-                  outline: "none",
-                  fontFamily: T.font,
-                }}
+                style={inputStyle(passwordFocused)}
               />
             </div>
 
             {displayError && (
-              <p style={{ fontSize: 13, color: T.urgent, fontWeight: 500, marginTop: -4 }}>{displayError}</p>
+              <p style={{ fontSize: 12, color: T.urgent, fontWeight: 500, marginTop: -4 }}>{displayError}</p>
             )}
 
             <button
               type="submit"
               disabled={loading || devSigningIn || !email || !password}
               style={{
-                marginTop: 4,
-                padding: "11px 0",
-                background: loading ? T.accent + "80" : T.accent,
+                marginTop: 8,
+                padding: "12px 0",
+                background: loading ? T.accent : T.accent,
                 color: "#fff",
                 border: "none",
                 borderRadius: T.radiusSm,
-                fontSize: 14,
+                fontSize: 15,
                 fontWeight: 600,
                 fontFamily: T.font,
                 cursor: loading || !email || !password ? "default" : "pointer",
-                opacity: !email || !password ? 0.6 : 1,
-                transition: "opacity 0.12s",
+                opacity: !email || !password ? 0.55 : 1,
+                transition: "opacity 0.15s ease, box-shadow 0.15s ease",
+                boxShadow: !email || !password ? "none" : "0 2px 8px rgba(30,158,73,0.25)",
               }}
             >
               {loading ? "Signing in…" : "Sign In"}
@@ -296,8 +305,16 @@ export default function LoginScreen({ externalError }: { externalError?: string 
           )}
         </div>
 
-        <p style={{ textAlign: "center", marginTop: 24, fontSize: 12, color: T.textLight }}>
-          {isDev ? "Dev mode · Firebase Auth" : "Parrish Health DME Portal"}
+        <p
+          style={{
+            textAlign: "center",
+            marginTop: 20,
+            fontSize: 12,
+            color: T.textLight,
+            fontWeight: 500,
+          }}
+        >
+          {isDev ? "Dev mode · Firebase Auth" : "© Parrish Health Systems of Ohio"}
         </p>
       </div>
     </div>

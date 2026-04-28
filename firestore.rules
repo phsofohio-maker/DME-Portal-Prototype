@@ -14,6 +14,11 @@ service cloud.firestore {
         get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.role == 'admin';
     }
 
+    function isNurse() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.role == 'nurse';
+    }
+
     function isOwner(uid) {
       return isSignedIn() && request.auth.uid == uid;
     }
@@ -122,11 +127,15 @@ service cloud.firestore {
     }
 
     // ── Patients ───────────────────────────────────────────────────────────
-    // All staff can read; admin can write (Phase 4 will add HL7 FHIR import).
+    // All staff can read. Admins and nurses can create new patients (admissions
+    // workflow). Updates remain admin-only. No deletes — soft-delete via
+    // status: 'inactive' (HIPAA record retention; Phase 4 will add HL7 FHIR).
 
     match /patients/{id} {
-      allow read:  if isSignedIn();
-      allow write: if isAdmin();
+      allow read:   if isSignedIn();
+      allow create: if isAdmin() || isNurse();
+      allow update: if isAdmin();
+      allow delete: if false;
     }
 
     // ── Mail (Trigger Email extension) ─────────────────────────────────────

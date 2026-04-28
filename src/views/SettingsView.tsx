@@ -20,7 +20,7 @@ const ROLE_COLORS: Record<string, string> = {
 
 interface SettingsViewProps {
   user: Staff;
-  onUpdateUser: (updates: Pick<Staff, "displayName">) => void;
+  onUpdateUser: (updates: Partial<Pick<Staff, "displayName" | "notificationPrefs">>) => void;
 }
 
 export default function SettingsView({ user, onUpdateUser }: SettingsViewProps) {
@@ -168,6 +168,23 @@ export default function SettingsView({ user, onUpdateUser }: SettingsViewProps) 
         </div>
       </Card>
 
+      {/* Notifications */}
+      <Card>
+        <h3
+          style={{
+            fontSize: 13,
+            fontWeight: 600,
+            color: T.textSub,
+            textTransform: "uppercase",
+            letterSpacing: 0.4,
+            marginBottom: 16,
+          }}
+        >
+          Notifications
+        </h3>
+        <SoundToggle user={user} onUpdateUser={onUpdateUser} />
+      </Card>
+
       {/* Security */}
       <Card>
         <h3
@@ -299,6 +316,89 @@ function SecurityRow({
       </div>
 
       <div style={{ flexShrink: 0 }}>{action}</div>
+    </div>
+  );
+}
+
+// ─── Sound toggle ─────────────────────────────────────────────────────────────
+
+function SoundToggle({
+  user,
+  onUpdateUser,
+}: {
+  user: Staff;
+  onUpdateUser: (updates: Partial<Pick<Staff, "displayName" | "notificationPrefs">>) => void;
+}) {
+  const enabled = user.notificationPrefs?.soundEnabled !== false;
+  const [saving, setSaving] = useState(false);
+
+  async function toggle() {
+    if (saving) return;
+    const nextPrefs = { ...user.notificationPrefs, soundEnabled: !enabled };
+    setSaving(true);
+    try {
+      await firebaseService.updateStaff(user.uid, { notificationPrefs: nextPrefs });
+      onUpdateUser({ notificationPrefs: nextPrefs });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "8px 0" }}>
+      <div
+        style={{
+          width: 38,
+          height: 38,
+          borderRadius: 9,
+          background: T.infoLight,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+        }}
+      >
+        <Icon name="bell" size={17} color={T.info} />
+      </div>
+      <div style={{ flex: 1 }}>
+        <p style={{ fontSize: 14, fontWeight: 600, color: T.text, marginBottom: 2 }}>Notification sound</p>
+        <p style={{ fontSize: 12, color: T.textSub }}>
+          Play a short tone when a new in-app notification arrives.
+        </p>
+      </div>
+      <button
+        onClick={toggle}
+        disabled={saving}
+        aria-pressed={enabled}
+        aria-label={`Notification sound ${enabled ? "on" : "off"}`}
+        style={{
+          width: 44,
+          height: 24,
+          borderRadius: 12,
+          border: "none",
+          padding: 0,
+          background: enabled ? T.accent : T.border,
+          cursor: saving ? "default" : "pointer",
+          position: "relative",
+          transition: "background 150ms ease",
+          flexShrink: 0,
+          opacity: saving ? 0.6 : 1,
+        }}
+      >
+        <span
+          style={{
+            position: "absolute",
+            top: 2,
+            left: enabled ? 22 : 2,
+            width: 20,
+            height: 20,
+            borderRadius: "50%",
+            background: "#fff",
+            transition: "left 150ms ease",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
+          }}
+        />
+      </button>
     </div>
   );
 }

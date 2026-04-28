@@ -2,7 +2,7 @@
 
 export type UserRole = "admin" | "nurse" | "homemaker" | "office_staff";
 export type RequestType = "dme" | "medication" | "multi_medication";
-export type RequestStatus = "pending" | "approved" | "denied" | "rmi";
+export type RequestStatus = "pending" | "approved" | "denied" | "rmi" | "filled";
 export type ViewId =
   | "dashboard"
   | "patients"
@@ -12,6 +12,7 @@ export type ViewId =
   | "new-request"
   | "messages"
   | "team"
+  | "audit"
   | "help"
   | "settings";
 
@@ -27,6 +28,7 @@ export interface Staff {
   notificationPrefs: {
     emailOnStatusChange: boolean;
     emailOnNewMessage: boolean;
+    soundEnabled?: boolean;
   };
   department?: string;
   phoneNumber?: string;
@@ -76,8 +78,8 @@ export interface DMEDetails {
   type: "dme";
   equipmentId: string;
   equipmentName: string;
-  icd10Code: string;
-  icd10Description: string;
+  icd10Code?: string;
+  icd10Description?: string;
   urgency: "routine" | "urgent" | "emergent";
   justification: string;
 }
@@ -120,7 +122,7 @@ export type RequestDetails = DMEDetails | MedicationDetails | MultiMedicationDet
 
 // ─── Document history ─────────────────────────────────────────────────────────
 
-export type HistoryAction = "created" | "approved" | "denied" | "rmi" | "updated";
+export type HistoryAction = "created" | "approved" | "denied" | "rmi" | "filled" | "updated";
 
 export interface HistoryEntry {
   action: HistoryAction;
@@ -179,6 +181,7 @@ export interface UserInvitation {
 export interface NotificationPrefs {
   emailOnStatusChange: boolean;
   emailOnNewMessage:   boolean;
+  soundEnabled?:       boolean;
 }
 
 export type NotificationType = "new_request" | "new_message" | "status_change";
@@ -188,6 +191,7 @@ export type NotificationType = "new_request" | "new_message" | "status_change";
 export type AuditAction =
   | "auth.login" | "auth.logout"
   | "request.created" | "request.updated"
+  | "request.approved" | "request.denied" | "request.rmi" | "request.filled"
   | "staff.invited" | "staff.suspended";
 
 export interface AuditLogEntry {

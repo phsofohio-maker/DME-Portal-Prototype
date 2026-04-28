@@ -155,6 +155,16 @@ Four roles are enforced via Firestore Security Rules: `admin`, `nurse`, `homemak
 | Application-Layer Encryption | AES-GCM-256 for messaging content via Web Crypto API | Done |
 | BAA — Google Cloud | Required before any PHI enters the system | Pending (Legal) |
 
+### Data Retention
+
+HIPAA §164.530(j) requires retention of compliance documentation for at least 6 years; many state medical-record statutes extend this to 7–10 years. The portal enforces retention at the Firestore Security Rules layer rather than via scheduled deletion:
+
+- **No hard deletes** on `requests`, `audit_log`, `patients`, `staff`, `invitations`, `communications`, or `conversationKeys` (`allow delete: if false;`).
+- **Soft-delete only** for staff (`status: "suspended"`) and patients (`status: "inactive"`).
+- **Lifecycle-tracked DME requests** progress `pending → approved → filled` (or `→ denied` / `→ rmi`); each transition appends to the request's `history` and writes a `request.<status>` entry to `audit_log` (admin-only, append-only).
+- **Only scheduled deletion** in the system is `cleanupEphemeralMessages`, which removes opt-in ephemeral chat messages at end-of-day (does not affect requests, audit, or patient records).
+- **Beyond 7 years**: a future Cloud Scheduler job will export aged records to GCS Coldline and remove from Firestore. Tracked separately; out of scope for the current build.
+
 ---
 
 ## Development Phases

@@ -13,7 +13,7 @@ export default function IdleWarningModal({ remainingSeconds, onStay, onLogout }:
   const secs = remainingSeconds % 60;
   const timeStr = mins > 0
     ? `${mins}:${secs.toString().padStart(2, "0")}`
-    : `${secs}s`;
+    : `0:${secs.toString().padStart(2, "0")}`;
 
   return (
     <div
@@ -24,63 +24,72 @@ export default function IdleWarningModal({ remainingSeconds, onStay, onLogout }:
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "rgba(44,40,37,0.5)",
-        backdropFilter: "blur(2px)",
+        background: T.overlay,
+        backdropFilter: "blur(4px)",
+        WebkitBackdropFilter: "blur(4px)",
+        padding: 20,
       }}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="idle-warning-title"
     >
       <div
         style={{
           background: T.bgCard,
           borderRadius: T.radius,
           boxShadow: T.shadowLg,
-          padding: "32px 28px",
-          maxWidth: 400,
-          width: "90%",
-          textAlign: "center",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: 16,
+          maxWidth: 440,
+          width: "100%",
+          overflow: "hidden",
+          fontFamily: T.font,
         }}
       >
-        <div
-          style={{
-            width: 56,
-            height: 56,
-            borderRadius: "50%",
-            background: T.warnLight,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Icon name="clock" size={28} color={T.warn} />
-        </div>
+        {/* Warning accent strip */}
+        <div style={{ height: 3, background: T.warn }} />
 
-        <div>
-          <h2
-            style={{
-              fontFamily: T.fontDisplay,
-              fontSize: 22,
-              fontWeight: 400,
-              color: T.text,
-              marginBottom: 8,
-            }}
-          >
-            Session Expiring
-          </h2>
-          <p style={{ fontSize: 14, color: T.textSub, lineHeight: 1.6 }}>
-            Your session will expire due to inactivity in{" "}
-            <strong style={{ color: T.warn, fontVariantNumeric: "tabular-nums" }}>
-              {timeStr}
-            </strong>
-            . Any unsaved changes may be lost.
-          </p>
-        </div>
+        <div style={{ padding: "28px 28px 24px" }}>
+          <div style={{ display: "flex", gap: 14, marginBottom: 14 }}>
+            <div
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: T.radiusFull,
+                background: T.warnLight,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
+              <Icon name="clock" size={20} color={T.warn} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h2
+                id="idle-warning-title"
+                style={{
+                  fontSize: 18,
+                  fontWeight: 700,
+                  color: T.text,
+                  marginBottom: 4,
+                  letterSpacing: "-0.01em",
+                }}
+              >
+                Session Expiring
+              </h2>
+              <p style={{ fontSize: 14, color: T.textSub, lineHeight: 1.55 }}>
+                You&rsquo;ll be logged out in{" "}
+                <strong style={{ color: T.warn, fontVariantNumeric: "tabular-nums", fontWeight: 700 }}>
+                  {timeStr}
+                </strong>{" "}
+                due to inactivity. Any unsaved changes have been auto-saved.
+              </p>
+            </div>
+          </div>
 
-        <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
-          <Btn variant="secondary" onClick={onLogout}>Log Out Now</Btn>
-          <Btn variant="primary" onClick={onStay}>Stay Logged In</Btn>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 18 }}>
+            <Btn variant="secondary" onClick={onLogout}>Log Out Now</Btn>
+            <Btn variant="primary" onClick={onStay}>Stay Logged In</Btn>
+          </div>
         </div>
       </div>
     </div>

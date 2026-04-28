@@ -10,7 +10,7 @@
  * the EHR's FHIR R4 endpoint.
  */
 
-import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { addDoc, collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { db } from './firebase';
 import type { Patient } from '../types';
 import { PATIENTS as STATIC_PATIENTS } from '../data/patients';
@@ -24,6 +24,8 @@ export interface PatientLookupService {
   search(query: string): Promise<Patient[]>;
   /** Look up a single patient by ID. Returns null if not found. */
   getById(id: string): Promise<Patient | null>;
+  /** Create a new patient document. Returns the new id. */
+  create(input: Omit<Patient, 'id'>): Promise<string>;
 }
 
 // ─── Firestore implementation ─────────────────────────────────────────────────
@@ -58,6 +60,12 @@ class FirestorePatientServiceImpl implements PatientLookupService {
     const all = await this.getAll();
     return all.find((p) => p.id === id) ?? null;
   }
+
+  async create(input: Omit<Patient, 'id'>): Promise<string> {
+    const ref = await addDoc(collection(db, 'patients'), input);
+    this.cache = null;
+    return ref.id;
+  }
 }
 
 // ─── Mock fallback ────────────────────────────────────────────────────────────
@@ -80,6 +88,10 @@ class MockPatientServiceImpl implements PatientLookupService {
 
   async getById(id: string): Promise<Patient | null> {
     return STATIC_PATIENTS.find((p: Patient) => p.id === id) ?? null;
+  }
+
+  async create(): Promise<string> {
+    throw new Error("Mock service cannot persist patients — Firestore unavailable.");
   }
 }
 
@@ -117,6 +129,10 @@ class CompositePatientService implements PatientLookupService {
     } catch {
       return this.mock.getById(id);
     }
+  }
+
+  async create(input: Omit<Patient, 'id'>): Promise<string> {
+    return this.firestore.create(input);
   }
 }
 

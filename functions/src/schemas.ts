@@ -15,8 +15,8 @@ const dmeDetailsSchema = z.object({
   type: z.literal("dme"),
   equipmentId: z.string().min(1),
   equipmentName: z.string().min(1),
-  icd10Code: z.string().min(1),
-  icd10Description: z.string(),
+  icd10Code: z.string().optional(),
+  icd10Description: z.string().optional(),
   urgency: z.enum(["routine", "urgent", "emergent"]),
   justification: z.string().min(1),
 });
@@ -89,7 +89,7 @@ export const requestCreateSchema = z.object({
 // ─── Status Update Validation ────────────────────────────────────────────────
 
 export const requestStatusUpdateSchema = z.object({
-  status: z.enum(["approved", "denied", "rmi"]),
+  status: z.enum(["approved", "denied", "rmi", "filled"]),
   adminNotes: z.string().optional(),
   processedBy: z.string().min(1),
   processedAt: z.number(),

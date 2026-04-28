@@ -1,10 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { T } from "./tokens";
-// Patient data is intentionally static seed data until Phase 4 (HL7 FHIR integration).
-// patientService.ts exists with Firestore support but is not wired until FHIR work begins.
-import { PATIENTS } from "./data/patients";
 import { onAuthChange, fetchStaffProfile, signOutUser } from "./services/authService";
 import { firebaseService } from "./services/firebaseService";
+import { patientService } from "./services/patientService";
+import { ToastProvider } from "./components/Toast";
 import { useIdleTimeout } from "./hooks/useIdleTimeout";
 import Sidebar from "./components/Sidebar";
 import TopBar from "./components/TopBar";
@@ -20,6 +19,7 @@ import MessagesView from "./views/MessagesView";
 import TeamView from "./views/TeamView";
 import HelpView from "./views/HelpView";
 import SettingsView from "./views/SettingsView";
+import AuditTrailView from "./views/AuditTrailView";
 import type { Staff, Patient, Request, Communication, AppNotification, UserInvitation, ViewId } from "./types";
 
 // ─── Placeholder view ─────────────────────────────────────────────────────────
@@ -52,6 +52,14 @@ function AuthLoading() {
 // ─── App root ─────────────────────────────────────────────────────────────────
 
 export default function App() {
+  return (
+    <ToastProvider>
+      <AppShell />
+    </ToastProvider>
+  );
+}
+
+function AppShell() {
   // ── Auth ──────────────────────────────────────────────────────────────────
   const [user, setUser] = useState<Staff | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -87,6 +95,17 @@ export default function App() {
   const [communications, setCommunications] = useState<Communication[]>([]);
   const [notifications,  setNotifications]  = useState<AppNotification[]>([]);
   const [invitations,    setInvitations]    = useState<UserInvitation[]>([]);
+  const [patients,       setPatients]       = useState<Patient[]>([]);
+
+  // Patients — load on sign-in (Firestore w/ static fallback when empty)
+  useEffect(() => {
+    if (!user) { setPatients([]); return; }
+    patientService.listAll().then(setPatients);
+  }, [user?.uid]);
+
+  async function refreshPatients() {
+    setPatients(await patientService.listAll());
+  }
 
   // Staff list — loaded once per session (admin only for invite management)
   useEffect(() => {
@@ -108,6 +127,18 @@ export default function App() {
     const unsubNotifs = firebaseService.subscribeToNotifications(user.uid, setNotifications);
     return () => { unsubReqs(); unsubComms(); unsubNotifs(); };
   }, [user?.uid, user?.role]);
+
+  // ── Notification sound on new incoming notification ──────────────────────
+  const lastNotifCountRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!user) { lastNotifCountRef.current = null; return; }
+    const prev = lastNotifCountRef.current;
+    lastNotifCountRef.current = notifications.length;
+    if (prev === null) return; // skip initial load
+    if (notifications.length <= prev) return;
+    if (user.notificationPrefs?.soundEnabled === false) return;
+    playNotificationPing();
+  }, [notifications.length, user?.uid, user?.notificationPrefs?.soundEnabled]);
 
   // Invitations — admin only (real-time)
   useEffect(() => {
@@ -220,7 +251,7 @@ export default function App() {
           <DashboardView
             user={user!}
             requests={requests}
-            patients={PATIENTS}
+            patients={patients}
             staff={staff}
             onSelectRequest={openRequest}
             onNavigate={navigate}
@@ -229,10 +260,12 @@ export default function App() {
       case "patients":
         return (
           <PatientsView
-            patients={PATIENTS}
+            user={user!}
+            patients={patients}
             requests={requests}
             staff={staff}
             onSelectPatient={openPatient}
+            onPatientAdded={refreshPatients}
           />
         );
       case "patient-detail":
@@ -253,7 +286,7 @@ export default function App() {
           <RequestListView
             user={user!}
             requests={requests}
-            patients={PATIENTS}
+            patients={patients}
             staff={staff}
             onSelectRequest={openRequest}
             onNewRequest={() => navigate("new-request")}
@@ -267,7 +300,7 @@ export default function App() {
           <RequestDetailView
             user={user!}
             request={liveRequest}
-            patients={PATIENTS}
+            patients={patients}
             staff={staff}
             onBack={() => navigate("requests")}
           />
@@ -279,7 +312,7 @@ export default function App() {
         return (
           <NewRequestView
             user={user!}
-            patients={PATIENTS}
+            patients={patients}
             preselectedPatient={newRequestPatient}
             onDone={() => { setNewRequestPatient(""); navigate("requests"); }}
           />
@@ -305,6 +338,10 @@ export default function App() {
             onRevokeInvite={(id) => firebaseService.revokeInvite(id)}
           />
         );
+      case "audit":
+        return user!.role === "admin"
+          ? <AuditTrailView />
+          : <PlaceholderView name="Not Authorized" />;
       case "help":
         return <HelpView />;
       case "settings":
@@ -317,5 +354,29 @@ export default function App() {
       default:
         return <PlaceholderView name="Not Found" />;
     }
+  }
+}
+
+// ─── Notification sound (Web Audio synthesis, no asset file) ─────────────────
+
+function playNotificationPing(): void {
+  try {
+    const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(660, ctx.currentTime + 0.18);
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.18, ctx.currentTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.32);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.34);
+    osc.onended = () => ctx.close();
+  } catch {
+    // Audio blocked by browser autoplay policy — silently no-op
   }
 }

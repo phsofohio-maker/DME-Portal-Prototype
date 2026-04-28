@@ -27,11 +27,9 @@ export default function Select({
       {label && (
         <label
           style={{
-            fontSize: 12,
+            fontSize: 13,
             fontWeight: 600,
-            color: T.textSub,
-            textTransform: "uppercase",
-            letterSpacing: 0.3,
+            color: T.text,
           }}
         >
           {label}
@@ -42,18 +40,19 @@ export default function Select({
         {...rest}
         style={{
           width: "100%",
-          fontSize: 14,
+          fontSize: 15,
           color: rest.value === "" ? T.textLight : T.text,
           background: T.bgCard,
-          border: `1px solid ${hasError ? T.urgent : focused ? T.accent : T.border}`,
+          border: `1.5px solid ${hasError ? T.urgent : focused ? T.accent : T.border}`,
           borderRadius: T.radiusSm,
           padding: "10px 12px",
           outline: "none",
           fontFamily: T.font,
           appearance: "none",
           cursor: "pointer",
-          transition: "border-color 0.12s",
-          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237A746C' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+          transition: "border-color 0.15s ease, box-shadow 0.15s ease",
+          boxShadow: focused && !hasError ? `0 0 0 3px ${T.accentGhost}` : "none",
+          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237A938D' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
           backgroundRepeat: "no-repeat",
           backgroundPosition: "right 12px center",
           paddingRight: 32,

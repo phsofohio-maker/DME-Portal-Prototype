@@ -22,6 +22,7 @@ const VIEW_META: Record<ViewId, { title: string; subtitle?: string }> = {
   "new-request":   { title: "New Request",  subtitle: "Submit a request"    },
   messages:        { title: "Messages",     subtitle: "Messaging Portal"    },
   team:            { title: "Team",         subtitle: "Team Management"     },
+  audit:           { title: "Audit Trail",  subtitle: "Activity & Access Log" },
   help:            { title: "Help Center",  subtitle: "FAQ & Support"       },
   settings:        { title: "Settings",     subtitle: "Account Settings"    },
 };
@@ -80,27 +81,39 @@ export default function TopBar({
   return (
     <header
       style={{
-        height: 64,
-        background: T.bgCard,
-        borderBottom: `1px solid ${T.borderLight}`,
-        display: "flex",
-        alignItems: "center",
-        padding: "0 24px",
-        gap: 16,
         position: "sticky",
         top: 0,
         zIndex: 50,
         flexShrink: 0,
+        background: T.bgCard,
+        borderBottom: `1px solid ${T.borderLight}`,
       }}
     >
+      {/* Gradient accent strip (HALO unified header marker) */}
+      <div
+        style={{
+          height: 3,
+          background: `linear-gradient(90deg, ${T.accent} 0%, ${T.secondary} 100%)`,
+        }}
+      />
+      <div
+        style={{
+          height: 64,
+          display: "flex",
+          alignItems: "center",
+          padding: "0 28px",
+          gap: 16,
+        }}
+      >
       {/* Title area */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <h1
           style={{
-            fontSize: 16,
-            fontWeight: 600,
+            fontSize: 20,
+            fontWeight: 800,
             color: T.text,
             lineHeight: 1.2,
+            letterSpacing: "-0.02em",
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -109,7 +122,7 @@ export default function TopBar({
           {title}
         </h1>
         {subtitle && (
-          <p style={{ fontSize: 12, color: T.textSub, marginTop: 1 }}>{subtitle}</p>
+          <p style={{ fontSize: 13, color: T.textSub, marginTop: 2 }}>{subtitle}</p>
         )}
       </div>
 
@@ -135,6 +148,7 @@ export default function TopBar({
 
         {/* Logout */}
         <LogoutBtn onClick={onLogout} />
+      </div>
       </div>
     </header>
   );

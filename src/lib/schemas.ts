@@ -10,13 +10,17 @@ import { z } from "zod";
 // ─── DME Request ─────────────────────────────────────────────────────────────
 
 export const dmeFormSchema = z.object({
-  patientId:        z.string().min(1, "Patient is required."),
-  equipmentId:      z.string().min(1, "Equipment is required."),
-  icd10Code:        z.string().min(1, "ICD-10 code is required."),
-  icd10Description: z.string(),
-  urgency:          z.enum(["routine", "urgent", "emergent"], { message: "Urgency is required." }),
-  justification:    z.string().min(10, "Clinical justification must be at least 10 characters."),
-});
+  patientId:           z.string().min(1, "Patient is required."),
+  equipmentId:         z.string().min(1, "Equipment is required."),
+  customEquipmentName: z.string().optional(),
+  icd10Code:           z.string().optional(),
+  icd10Description:    z.string().optional(),
+  urgency:             z.enum(["routine", "urgent", "emergent"], { message: "Urgency is required." }),
+  justification:       z.string().min(10, "Clinical justification must be at least 10 characters."),
+}).refine(
+  (data) => data.equipmentId !== "other" || (data.customEquipmentName?.trim().length ?? 0) >= 3,
+  { message: "Please describe the equipment (at least 3 characters).", path: ["customEquipmentName"] }
+);
 
 export type DmeFormData = z.infer<typeof dmeFormSchema>;
 
@@ -110,6 +114,24 @@ export const profileUpdateSchema = z.object({
 });
 
 export type ProfileUpdateData = z.infer<typeof profileUpdateSchema>;
+
+// ─── New Patient ─────────────────────────────────────────────────────────────
+
+export const patientFormSchema = z.object({
+  name:          z.string().min(2, "Name is required."),
+  dob:           z.string().min(1, "Date of birth is required."),
+  mrn:           z.string().min(4, "MRN must be at least 4 characters."),
+  insurance:     z.string().min(1, "Insurance is required."),
+  phone:         z.string().min(7, "Phone number is required."),
+  address:       z.string().min(1, "Address is required."),
+  primaryNurse:  z.string().min(1, "Primary nurse is required."),
+  allergies:     z.string().optional(),
+  conditions:    z.string().optional(),
+  clinicalNotes: z.string().optional(),
+  admittedDate:  z.string().min(1, "Admitted date is required."),
+});
+
+export type PatientFormData = z.infer<typeof patientFormSchema>;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

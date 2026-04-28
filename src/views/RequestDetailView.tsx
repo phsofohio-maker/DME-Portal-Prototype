@@ -13,7 +13,16 @@ import { reqTitle } from "../utils/statusHelpers";
 import { exportRequestPdf } from "../utils/pdfExport";
 import { frequencyLabel } from "../data/frequencyOptions";
 import { adminActionSchema } from "../lib/schemas";
+import { useToast } from "../hooks/useToast";
 import type { Staff, Request, Patient, RequestStatus, HistoryEntry } from "../types";
+
+const STATUS_TOAST_LABELS: Record<RequestStatus, string> = {
+  pending:  "Marked pending",
+  approved: "Request approved",
+  denied:   "Request denied",
+  rmi:      "More info requested",
+  filled:   "Request marked as filled",
+};
 
 // ─── History helpers ──────────────────────────────────────────────────────────
 
@@ -22,6 +31,7 @@ const HISTORY_COLORS: Record<string, string> = {
   approved: T.accent,
   denied:   T.urgent,
   rmi:      T.warn,
+  filled:   T.purple,
   updated:  T.info,
 };
 
@@ -30,6 +40,7 @@ const HISTORY_LABELS: Record<string, string> = {
   approved: "Approved",
   denied:   "Denied",
   rmi:      "More info requested",
+  filled:   "Filled",
   updated:  "Updated",
 };
 
@@ -97,6 +108,7 @@ export default function RequestDetailView({
   onBack,
   backLabel = "Back to Requests",
 }: RequestDetailViewProps) {
+  const toast = useToast();
   const [adminNotes, setAdminNotes] = useState(request.adminNotes ?? "");
   const [actionLoading, setActionLoading] = useState<RequestStatus | null>(null);
   const [actionError, setActionError] = useState("");
@@ -108,6 +120,7 @@ export default function RequestDetailView({
   const processor = staff.find((s) => s.uid === request.processedBy);
   const isAdmin = user.role === "admin";
   const canAct  = isAdmin && (request.status === "pending" || request.status === "rmi");
+  const canMarkFilled = isAdmin && request.status === "approved" && request.details.type === "dme";
 
   async function handleAction(newStatus: RequestStatus) {
     const parsed = adminActionSchema.safeParse({ action: newStatus, notes: adminNotes });
@@ -127,9 +140,26 @@ export default function RequestDetailView({
         user,
         request.status
       );
+      toast.success(STATUS_TOAST_LABELS[newStatus]);
       onBack();
     } catch {
       setActionError("Failed to update request. Please try again.");
+      toast.error("Failed to update request");
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleMarkFilled() {
+    setActionError("");
+    setActionLoading("filled");
+    try {
+      await firebaseService.markFilled(request.id, user, request.status);
+      toast.success("Request marked as filled");
+      onBack();
+    } catch {
+      setActionError("Failed to mark as filled. Please try again.");
+      toast.error("Failed to mark as filled");
     } finally {
       setActionLoading(null);
     }
@@ -269,27 +299,29 @@ export default function RequestDetailView({
                 }
               />
             </div>
-            <InfoRow
-              label="ICD-10 Diagnosis"
-              value={
-                <span>
-                  <span
-                    style={{
-                      fontSize: 12,
-                      fontWeight: 700,
-                      color: T.info,
-                      background: T.infoLight,
-                      padding: "2px 6px",
-                      borderRadius: 4,
-                      marginRight: 8,
-                    }}
-                  >
-                    {details.icd10Code}
+            {details.icd10Code && (
+              <InfoRow
+                label="ICD-10 Diagnosis"
+                value={
+                  <span>
+                    <span
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: T.info,
+                        background: T.infoLight,
+                        padding: "2px 6px",
+                        borderRadius: 4,
+                        marginRight: 8,
+                      }}
+                    >
+                      {details.icd10Code}
+                    </span>
+                    {details.icd10Description}
                   </span>
-                  {details.icd10Description}
-                </span>
-              }
-            />
+                }
+              />
+            )}
             <InfoRow label="Clinical Justification" value={
               <p style={{ lineHeight: 1.65, color: T.text }}>{details.justification}</p>
             } />
@@ -575,6 +607,40 @@ export default function RequestDetailView({
               </Btn>
             </div>
           </div>
+        </Card>
+      )}
+
+      {/* Mark as Filled (DME fulfillment tracking) */}
+      {canMarkFilled && (
+        <Card style={{ border: `1px solid ${T.border}` }}>
+          <h3
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: T.textSub,
+              textTransform: "uppercase",
+              letterSpacing: 0.4,
+              marginBottom: 12,
+            }}
+          >
+            Fulfillment
+          </h3>
+          <p style={{ fontSize: 13, color: T.textSub, marginBottom: 14, lineHeight: 1.55 }}>
+            Mark this DME request as filled once the equipment has been delivered to the patient.
+          </p>
+          {actionError && (
+            <span style={{ fontSize: 11, color: T.urgent, fontWeight: 500, marginBottom: 8, display: "block" }}>
+              {actionError}
+            </span>
+          )}
+          <Btn
+            variant="primary"
+            icon="check"
+            onClick={handleMarkFilled}
+            disabled={actionLoading !== null}
+          >
+            {actionLoading === "filled" ? "Saving…" : "Mark as Filled"}
+          </Btn>
         </Card>
       )}
 

@@ -20,6 +20,8 @@ export function statusColor(status: RequestStatus): StatusStyle {
       return { color: T.urgent, bg: T.urgentLight,  dot: T.urgent, label: "Denied" };
     case "rmi":
       return { color: T.info,   bg: T.infoLight,    dot: T.info,   label: "Needs Info" };
+    case "filled":
+      return { color: T.purple, bg: T.purpleLight,  dot: T.purple, label: "Filled" };
   }
 }
 

@@ -13,6 +13,7 @@ import { DME_CATALOG } from "../data/dmeCatalog";
 import { firebaseService } from "../services/firebaseService";
 import { FREQUENCY_OPTIONS } from "../data/frequencyOptions";
 import { dmeFormSchema, medicationFormSchema, multiMedicationFormSchema, drugRowSchema, fieldErrors } from "../lib/schemas";
+import { useToast } from "../hooks/useToast";
 import type { Staff, Patient, RequestType, Drug } from "../types";
 
 function todayISO(): string {
@@ -270,6 +271,7 @@ function PatientSelect({
 interface DmeFormValues {
   patientId: string;
   equipmentId: string;
+  customEquipmentName: string;
   icd10Code: string;
   icd10Description: string;
   urgency: string;
@@ -289,13 +291,15 @@ function DmeForm({
   onDone: () => void;
   onBack: () => void;
 }) {
+  const toast = useToast();
   const [vals, setVals] = useState<DmeFormValues>({
-    patientId:        preselectedPatient,
-    equipmentId:      "",
-    icd10Code:        "",
-    icd10Description: "",
-    urgency:          "routine",
-    justification:    "",
+    patientId:           preselectedPatient,
+    equipmentId:         "",
+    customEquipmentName: "",
+    icd10Code:           "",
+    icd10Description:    "",
+    urgency:             "routine",
+    justification:       "",
   });
   const [errors, setErrors] = useState<Partial<DmeFormValues>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -315,7 +319,9 @@ function DmeForm({
 
   async function handleSubmit() {
     if (!validate()) return;
-    const equipment = DME_CATALOG.find((d) => d.id === vals.equipmentId)!;
+    const equipmentName = vals.equipmentId === "other"
+      ? vals.customEquipmentName.trim()
+      : DME_CATALOG.find((d) => d.id === vals.equipmentId)!.name;
     setSubmitting(true);
     setSubmitError("");
     try {
@@ -323,18 +329,22 @@ function DmeForm({
         patientId:   vals.patientId,
         submittedBy: user.uid,
         details: {
-          type:             "dme",
-          equipmentId:      vals.equipmentId,
-          equipmentName:    equipment.name,
-          icd10Code:        vals.icd10Code,
-          icd10Description: vals.icd10Description,
-          urgency:          vals.urgency as "routine" | "urgent" | "emergent",
-          justification:    vals.justification,
+          type:          "dme",
+          equipmentId:   vals.equipmentId,
+          equipmentName,
+          ...(vals.icd10Code ? {
+            icd10Code:        vals.icd10Code,
+            icd10Description: vals.icd10Description,
+          } : {}),
+          urgency:       vals.urgency as "routine" | "urgent" | "emergent",
+          justification: vals.justification,
         },
       }, user);
+      toast.success("DME request submitted");
       onDone();
     } catch {
       setSubmitError("Failed to submit request. Please try again.");
+      toast.error("Failed to submit request");
     } finally {
       setSubmitting(false);
     }
@@ -371,7 +381,21 @@ function DmeForm({
             ))}
           </optgroup>
         ))}
+        <optgroup label="Other">
+          <option value="other">Other (specify below)</option>
+        </optgroup>
       </Select>
+
+      {vals.equipmentId === "other" && (
+        <Input
+          label="Equipment name"
+          required
+          placeholder="Describe the requested item"
+          value={vals.customEquipmentName}
+          onChange={(e) => set("customEquipmentName", e.target.value)}
+          error={errors.customEquipmentName}
+        />
+      )}
 
       <Icd10Search
         code={vals.icd10Code}
@@ -380,8 +404,7 @@ function DmeForm({
           setVals((v) => ({ ...v, icd10Code: code, icd10Description: desc }));
           setErrors((e) => ({ ...e, icd10Code: "" }));
         }}
-        label="ICD-10 Diagnosis Code"
-        required
+        label="ICD-10 Diagnosis Code (optional)"
         error={errors.icd10Code}
       />
 
@@ -452,6 +475,7 @@ function MedicationForm({
   onDone: () => void;
   onBack: () => void;
 }) {
+  const toast = useToast();
   const [vals, setVals] = useState<MedFormValues>({
     patientId:      preselectedPatient,
     drugName:       "",
@@ -509,9 +533,11 @@ function MedicationForm({
           justification: vals.justification || undefined,
         },
       }, user);
+      toast.success("Medication request submitted");
       onDone();
     } catch {
       setSubmitError("Failed to submit request. Please try again.");
+      toast.error("Failed to submit request");
     } finally {
       setSubmitting(false);
     }
@@ -696,6 +722,7 @@ function MultiMedForm({
   onDone: () => void;
   onBack: () => void;
 }) {
+  const toast = useToast();
   const [patientId, setPatientId] = useState(preselectedPatient);
   const [patientError, setPatientError] = useState("");
   const [rows, setRows] = useState<DrugRow[]>([
@@ -802,9 +829,11 @@ function MultiMedForm({
           pharmacy,
         },
       }, user);
+      toast.success(`${rows.length} medication request${rows.length === 1 ? "" : "s"} submitted`);
       onDone();
     } catch {
       setSubmitError("Failed to submit request. Please try again.");
+      toast.error("Failed to submit request");
     } finally {
       setSubmitting(false);
     }

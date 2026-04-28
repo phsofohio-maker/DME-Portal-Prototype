@@ -29,7 +29,7 @@ export default function Card({
         background: T.bgCard,
         border: `1px solid ${T.borderLight}`,
         borderRadius: T.radius,
-        boxShadow: hovered && isInteractive ? T.shadowLg : T.shadow,
+        boxShadow: hovered && isInteractive ? T.shadowCardHover : T.shadow,
         padding,
         cursor: onClick ? "pointer" : undefined,
         transform: hovered && isInteractive ? "translateY(-1px)" : "translateY(0)",

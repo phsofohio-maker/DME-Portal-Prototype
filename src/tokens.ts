@@ -1,45 +1,76 @@
+// Parrish HALO design tokens. Values align with the unified HALO branding guide
+// so all three apps (CTI, LMS, DME) read from the same palette and type scale.
+// Existing key names are preserved so components continue to compile.
+
 export const T = {
-  // Backgrounds
-  bg: "#F7F4EF",
-  bgSub: "#EFEBE4",
-  bgCard: "#FFFFFF",
-  bgHover: "#F0EDE6",
+  // ── Backgrounds ──────────────────────────────────────────────────────────
+  bg:           "#FAFBF9", // app canvas
+  bgSub:        "#F4F5F0", // page header strip, subtle surfaces
+  bgCard:       "#FFFFFF",
+  bgHover:      "rgba(30,158,73,0.06)", // subtle green tint on hover
 
-  // Brand / Accent
-  accent: "#5B7A5E",
-  accentLight: "#E8F0E9",
-  accentDark: "#3D5A40",
+  // Sidebar (dark navy surface)
+  bgSidebar:         "#011E84",
+  bgSidebarHover:    "#092783",
+  bgSidebarActive:   "#0D529D",
 
-  // Semantic colors
-  urgent: "#C4533A",
-  urgentLight: "#FCEAE6",
-  warn: "#C9972D",
-  warnLight: "#FFF7E6",
-  info: "#4A7A9B",
-  infoLight: "#E6F0F7",
-  purple: "#7B61A8",
-  purpleLight: "#F0ECF6",
+  // ── Brand / Primary (HALO Green) ────────────────────────────────────────
+  accent:       "#1E9E49",
+  accentLight:  "#E8F5EE",
+  accentDark:   "#178A3E",
+  accentGhost:  "rgba(30,158,73,0.08)",
 
-  // Text
-  text: "#2C2825",
-  textSub: "#7A746C",
-  textLight: "#A9A29A",
+  // ── Secondary (HALO Blue) ───────────────────────────────────────────────
+  secondary:      "#0D529D",
+  secondaryHover: "#0A61A0",
+  secondaryLight: "#EEF3FB",
 
-  // Borders
-  border: "#E2DDD5",
-  borderLight: "#EDE9E2",
+  // DME app accent (thin accents only, per guide §3.3)
+  appAccent:    "#2C70B9",
 
-  // Elevation
-  shadow: "0 1px 3px rgba(44,40,37,0.06), 0 1px 2px rgba(44,40,37,0.04)",
-  shadowLg: "0 4px 16px rgba(44,40,37,0.08), 0 2px 6px rgba(44,40,37,0.04)",
+  // ── Semantic colors ─────────────────────────────────────────────────────
+  urgent:       "#DC3545",
+  urgentLight:  "#FDECEA",
+  warn:         "#E6A817",
+  warnLight:    "#FEF9E7",
+  info:         "#0D529D",
+  infoLight:    "#EEF3FB",
+  // Purple preserved for role colour variety. Mapped to HALO blue-mid.
+  purple:       "#3C55A0",
+  purpleLight:  "#E5EAF4",
 
-  // Shape
-  radius: "10px",
-  radiusSm: "6px",
+  // ── Text ────────────────────────────────────────────────────────────────
+  text:         "#1A2E28", // primary headings/body
+  textSub:      "#3D5450", // body paragraphs
+  textLight:    "#7A938D", // muted/helper text
+  textOnDark:   "#FFFFFF",
+  textOnDarkMuted: "rgba(255,255,255,0.62)",
+  textLink:     "#0D529D",
 
-  // Typography
-  font: "'DM Sans', sans-serif",
-  fontDisplay: "'Instrument Serif', serif",
+  // ── Borders ─────────────────────────────────────────────────────────────
+  border:       "#D1D9D5", // input borders
+  borderLight:  "#E8EBE6", // card/dividers
+
+  // ── Elevation ───────────────────────────────────────────────────────────
+  shadow:       "0 1px 4px rgba(1,30,132,0.05)",
+  shadowMd:     "0 4px 12px rgba(1,30,132,0.08)",
+  shadowLg:     "0 8px 30px rgba(1,30,132,0.10)",
+  shadowCardHover: "0 6px 20px rgba(1,30,132,0.10)",
+
+  // Modal backdrop (tinted brand navy per spec)
+  overlay:      "rgba(1,30,132,0.40)",
+
+  // ── Shape ───────────────────────────────────────────────────────────────
+  radius:       "14px", // card / modal default
+  radiusSm:     "10px", // buttons, inputs, nav items
+  radiusXs:     "6px",
+  radiusLg:     "18px",
+  radiusFull:   "9999px",
+
+  // ── Typography ──────────────────────────────────────────────────────────
+  font:         "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  fontDisplay:  "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  fontSerif:    "'Source Serif 4', Georgia, 'Times New Roman', serif",
 } as const;
 
 export type Tokens = typeof T;

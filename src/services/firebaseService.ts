@@ -215,6 +215,29 @@ export const firebaseService = {
     return snap.docs.map((d) => toRequest(d.id, d.data()));
   },
 
+  markFilled: async (requestId: string, admin: Staff, previousStatus: RequestStatus): Promise<void> => {
+    const now = Date.now();
+    const entry: HistoryEntry = {
+      action:         'filled',
+      actorId:        admin.uid,
+      actorName:      admin.displayName,
+      actorRole:      admin.role,
+      timestamp:      now,
+      previousStatus,
+      newStatus:      'filled',
+    };
+    await retryWithBackoff(
+      () => updateDoc(doc(db, 'requests', requestId), {
+        status:      'filled',
+        processedBy: admin.uid,
+        processedAt: now,
+        updatedAt:   now,
+        history:     arrayUnion(entry),
+      }),
+      'markFilled'
+    );
+  },
+
   updateRequestStatus: async (
     requestId:      string,
     status:         RequestStatus,
@@ -423,7 +446,7 @@ export const firebaseService = {
     ]);
 
     const requests = requestsSnap.docs.map((d) => toRequest(d.id, d.data()));
-    const byStatus: Record<string, number> = { pending: 0, approved: 0, denied: 0, rmi: 0 };
+    const byStatus: Record<string, number> = { pending: 0, approved: 0, denied: 0, rmi: 0, filled: 0 };
     for (const r of requests) byStatus[r.status] = (byStatus[r.status] ?? 0) + 1;
 
     const thirtyDaysAgo  = Date.now() - 30 * 24 * 60 * 60 * 1000;
